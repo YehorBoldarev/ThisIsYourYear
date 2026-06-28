@@ -1,0 +1,17 @@
+# Binaries
+/bin/
+*.exe
+*.out
+
+# Local environment
+.env
+
+# Test & coverage artifacts
+coverage.out
+coverage.html
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+.DS_Store

@@ -1,0 +1,45 @@
+# Development orchestration.
+#
+#   docker compose -f deployments/docker-compose.yml up -d        # Mongo only
+#   docker compose -f deployments/docker-compose.yml --profile app up --build
+#
+# By default only MongoDB runs in Docker so the API can be iterated on locally
+# via `go run`. The API service is gated behind the "app" profile.
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: tiyy-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: tiyy-api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      HTTP_PORT: "8080"
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DATABASE: thisisyouryear
+      LOG_LEVEL: info
+    ports:
+      - "8080:8080"
+
+volumes:
+  mongo-data:
