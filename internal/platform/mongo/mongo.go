@@ -7,6 +7,7 @@ package mongo
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -15,10 +16,13 @@ import (
 )
 
 // Client bundles a connected Mongo client together with the handle to the
-// application's database.
+// application's database and a registry of indexes to ensure on startup.
 type Client struct {
 	client *mongo.Client
 	db     *mongo.Database
+
+	mu      sync.Mutex
+	indexes map[string][]IndexSpec // collection name -> specs
 }
 
 // Connect dials MongoDB at uri, verifies connectivity with a ping, and returns a
@@ -33,7 +37,11 @@ func Connect(ctx context.Context, uri, database string, timeout time.Duration) (
 		return nil, fmt.Errorf("connect to mongo: %w", err)
 	}
 
-	c := &Client{client: client, db: client.Database(database)}
+	c := &Client{
+		client:  client,
+		db:      client.Database(database),
+		indexes: make(map[string][]IndexSpec),
+	}
 
 	if err := c.Ping(connectCtx); err != nil {
 		// Disconnect to avoid leaking the partially established client.
@@ -57,11 +65,34 @@ func (c *Client) Ping(ctx context.Context) error {
 	return nil
 }
 
-// EnsureIndexes creates any indexes the application relies on. It is idempotent
-// and safe to call on every startup. Indexes are added here as collections are
-// introduced by later steps; for now it is intentionally a no-op hook.
+// RegisterIndexes records index specs for a collection to be created by
+// EnsureIndexes. Concrete repositories call this at construction time, before the
+// application invokes EnsureIndexes during startup. It is safe for concurrent use.
+func (c *Client) RegisterIndexes(collection string, specs ...IndexSpec) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.indexes[collection] = append(c.indexes[collection], specs...)
+}
+
+// EnsureIndexes creates every registered index. Creating an index that already
+// exists with the same definition is a no-op, so this is idempotent and safe to
+// call on every startup.
 func (c *Client) EnsureIndexes(ctx context.Context) error {
-	_ = ctx
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for collection, specs := range c.indexes {
+		if len(specs) == 0 {
+			continue
+		}
+		models := make([]mongo.IndexModel, 0, len(specs))
+		for _, spec := range specs {
+			models = append(models, spec.model())
+		}
+		if _, err := c.db.Collection(collection).Indexes().CreateMany(ctx, models); err != nil {
+			return fmt.Errorf("ensure indexes for collection %q: %w", collection, err)
+		}
+	}
 	return nil
 }
 
