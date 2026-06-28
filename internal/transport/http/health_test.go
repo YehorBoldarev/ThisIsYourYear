@@ -46,6 +46,27 @@ func TestReadinessHandler_Unavailable(t *testing.T) {
 	require.Equal(t, "unavailable", decodeStatus(t, rec))
 }
 
+// deadlineCapturingPinger records whether the context it receives carries a
+// deadline, proving the readiness probe bounds how long it waits on a
+// dependency instead of inheriting an unbounded/long driver timeout.
+type deadlineCapturingPinger struct{ hadDeadline bool }
+
+func (p *deadlineCapturingPinger) Ping(ctx context.Context) error {
+	_, p.hadDeadline = ctx.Deadline()
+	return nil
+}
+
+func TestReadinessHandler_BoundsPingWithDeadline(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+
+	pinger := &deadlineCapturingPinger{}
+	readinessHandler(pinger)(rec, req)
+
+	require.True(t, pinger.hadDeadline, "readiness ping must run under a bounded deadline")
+	require.Equal(t, http.StatusOK, rec.Code)
+}
+
 func decodeStatus(t *testing.T, rec *httptest.ResponseRecorder) string {
 	t.Helper()
 	var body map[string]string

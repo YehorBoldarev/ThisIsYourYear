@@ -4,7 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 )
+
+// readinessProbeTimeout bounds how long a readiness check waits on its
+// dependencies. It is deliberately short so the probe reports "not ready"
+// quickly instead of inheriting the Mongo driver's long server-selection
+// timeout, which would make an unhealthy instance appear to hang.
+const readinessProbeTimeout = 2 * time.Second
 
 // Pinger reports whether a downstream dependency (e.g. MongoDB) is reachable.
 // The health handlers depend on this narrow interface rather than a concrete
@@ -24,7 +31,10 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 // currently serve real traffic, which requires its dependencies to be reachable.
 func readinessHandler(pinger Pinger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := pinger.Ping(r.Context()); err != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), readinessProbeTimeout)
+		defer cancel()
+
+		if err := pinger.Ping(ctx); err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "unavailable",
 				"reason": "database unreachable",
