@@ -22,6 +22,14 @@ func TestLoad_Defaults(t *testing.T) {
 	require.Equal(t, "info", cfg.LogLevel)
 	require.Equal(t, 15*time.Second, cfg.ShutdownTimeout)
 	require.False(t, cfg.IsProduction())
+
+	// Auth defaults.
+	require.Equal(t, 15*time.Minute, cfg.AccessTokenTTL)
+	require.Equal(t, 744*time.Hour, cfg.RefreshTTLRemember)
+	require.Equal(t, 24*time.Hour, cfg.RefreshTTLDefault)
+	require.Equal(t, 12, cfg.BcryptCost)
+	require.True(t, cfg.CookieSecure)
+	require.Empty(t, cfg.CORSAllowedOrigins)
 }
 
 func TestLoad_Overrides(t *testing.T) {
@@ -31,6 +39,8 @@ func TestLoad_Overrides(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("MONGO_DATABASE", "custom")
 	t.Setenv("SHUTDOWN_TIMEOUT", "30s")
+	// Production requires a real signing secret.
+	t.Setenv("JWT_SECRET", "a-strong-production-secret")
 
 	cfg, err := Load()
 	require.NoError(t, err)
@@ -48,10 +58,14 @@ func TestLoad_InvalidValues(t *testing.T) {
 	// environment variable as unset and falls back to the default, so empty
 	// values cannot reach validation via the environment.
 	tests := map[string]map[string]string{
-		"invalid app env":   {"APP_ENV": "staging"},
-		"port too low":      {"HTTP_PORT": "0"},
-		"port too high":     {"HTTP_PORT": "70000"},
-		"invalid log level": {"LOG_LEVEL": "verbose"},
+		"invalid app env":      {"APP_ENV": "staging"},
+		"port too low":         {"HTTP_PORT": "0"},
+		"port too high":        {"HTTP_PORT": "70000"},
+		"invalid log level":    {"LOG_LEVEL": "verbose"},
+		"bcrypt cost too low":  {"BCRYPT_COST": "4"},
+		"bcrypt cost too high": {"BCRYPT_COST": "40"},
+		"prod default secret":  {"APP_ENV": "production", "JWT_SECRET": "dev-insecure-jwt-secret-change-me"},
+		"wildcard cors origin": {"CORS_ALLOWED_ORIGINS": "*"},
 	}
 
 	for name, overrides := range tests {
@@ -71,11 +85,16 @@ func TestLoad_InvalidValues(t *testing.T) {
 func TestValidate(t *testing.T) {
 	base := func() Config {
 		return Config{
-			AppEnv:        EnvDevelopment,
-			HTTPPort:      8080,
-			LogLevel:      "info",
-			MongoURI:      "mongodb://localhost:27017",
-			MongoDatabase: "thisisyouryear",
+			AppEnv:             EnvDevelopment,
+			HTTPPort:           8080,
+			LogLevel:           "info",
+			MongoURI:           "mongodb://localhost:27017",
+			MongoDatabase:      "thisisyouryear",
+			JWTSecret:          "some-secret",
+			AccessTokenTTL:     15 * time.Minute,
+			RefreshTTLRemember: 744 * time.Hour,
+			RefreshTTLDefault:  24 * time.Hour,
+			BcryptCost:         12,
 		}
 	}
 
@@ -88,6 +107,19 @@ func TestValidate(t *testing.T) {
 	emptyDB := base()
 	emptyDB.MongoDatabase = ""
 	require.Error(t, emptyDB.validate())
+
+	emptySecret := base()
+	emptySecret.JWTSecret = ""
+	require.Error(t, emptySecret.validate())
+
+	nonPositiveTTL := base()
+	nonPositiveTTL.AccessTokenTTL = 0
+	require.Error(t, nonPositiveTTL.validate())
+
+	prodDefaultSecret := base()
+	prodDefaultSecret.AppEnv = EnvProduction
+	prodDefaultSecret.JWTSecret = devJWTSecret
+	require.Error(t, prodDefaultSecret.validate())
 }
 
 // clearKnownEnv unsets every environment variable the config reads so a test
@@ -100,8 +132,10 @@ func clearKnownEnv(t *testing.T) {
 		"APP_ENV", "HTTP_PORT", "HTTP_READ_TIMEOUT", "HTTP_WRITE_TIMEOUT",
 		"HTTP_IDLE_TIMEOUT", "SHUTDOWN_TIMEOUT", "MONGO_URI", "MONGO_DATABASE",
 		"MONGO_TIMEOUT", "LOG_LEVEL",
+		"JWT_SECRET", "ACCESS_TOKEN_TTL", "REFRESH_TTL_REMEMBER",
+		"REFRESH_TTL_DEFAULT", "BCRYPT_COST", "COOKIE_DOMAIN", "COOKIE_SECURE",
+		"CORS_ALLOWED_ORIGINS",
 	} {
-		key := key
 		original, existed := os.LookupEnv(key)
 		require.NoError(t, os.Unsetenv(key))
 		t.Cleanup(func() {

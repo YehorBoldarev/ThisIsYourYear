@@ -16,6 +16,13 @@ var (
 	ErrConflict = errors.New("resource conflict")
 	// ErrValidation indicates input failed a business or format rule.
 	ErrValidation = errors.New("validation failed")
+	// ErrUnauthenticated indicates the request lacks a valid credential (e.g. a
+	// missing, malformed, or expired access token).
+	ErrUnauthenticated = errors.New("unauthenticated")
+	// ErrInvalidCredentials indicates an authentication attempt failed because the
+	// supplied email/password did not match. It is deliberately generic so callers
+	// cannot distinguish "unknown email" from "wrong password" (no user enumeration).
+	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 // IsNotFound reports whether err is or wraps ErrNotFound.
@@ -26,3 +33,9 @@ func IsConflict(err error) bool { return errors.Is(err, ErrConflict) }
 
 // IsValidation reports whether err is or wraps ErrValidation.
 func IsValidation(err error) bool { return errors.Is(err, ErrValidation) }
+
+// IsUnauthenticated reports whether err is or wraps ErrUnauthenticated.
+func IsUnauthenticated(err error) bool { return errors.Is(err, ErrUnauthenticated) }
+
+// IsInvalidCredentials reports whether err is or wraps ErrInvalidCredentials.
+func IsInvalidCredentials(err error) bool { return errors.Is(err, ErrInvalidCredentials) }

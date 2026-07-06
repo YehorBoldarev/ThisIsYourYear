@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -91,9 +92,7 @@ func (r *Repository[T, PT]) Update(ctx context.Context, id string, fields bson.M
 	}
 
 	set := make(bson.M, len(fields)+1)
-	for k, v := range fields {
-		set[k] = v
-	}
+	maps.Copy(set, fields)
 	set["updatedAt"] = r.clock().UTC()
 
 	res, err := r.coll.UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": set})
@@ -104,6 +103,22 @@ func (r *Repository[T, PT]) Update(ctx context.Context, id string, fields bson.M
 		return domain.ErrNotFound
 	}
 	return nil
+}
+
+// UpdateMany applies fields as a $set on every document matching filter and
+// bumps updatedAt on each. It returns the number of documents modified; matching
+// zero documents is not an error. Use it for bulk state changes such as revoking
+// all of a user's sessions.
+func (r *Repository[T, PT]) UpdateMany(ctx context.Context, filter bson.M, fields bson.M) (int64, error) {
+	set := make(bson.M, len(fields)+1)
+	maps.Copy(set, fields)
+	set["updatedAt"] = r.clock().UTC()
+
+	res, err := r.coll.UpdateMany(ctx, filter, bson.M{"$set": set})
+	if err != nil {
+		return 0, translate(err)
+	}
+	return res.ModifiedCount, nil
 }
 
 // Delete removes the document with the given hex id (hard delete). A missing

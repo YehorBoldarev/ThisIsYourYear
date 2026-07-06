@@ -6,6 +6,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -19,6 +20,13 @@ const (
 	EnvDevelopment Environment = "development"
 	EnvProduction  Environment = "production"
 )
+
+// devJWTSecret is the throwaway signing secret used when none is configured. It
+// exists only so the service runs out-of-the-box in development; using it in
+// production is rejected by validation. It is not a real credential.
+//
+//nolint:gosec // G101: intentional non-secret development placeholder, rejected in production by validate().
+const devJWTSecret = "dev-insecure-jwt-secret-change-me"
 
 // Config holds all runtime configuration for the API service.
 //
@@ -36,6 +44,18 @@ type Config struct {
 	MongoURI      string        `env:"MONGO_URI" envDefault:"mongodb://localhost:27017"`
 	MongoDatabase string        `env:"MONGO_DATABASE" envDefault:"thisisyouryear"`
 	MongoTimeout  time.Duration `env:"MONGO_TIMEOUT" envDefault:"10s"`
+
+	// Authentication.
+	JWTSecret          string        `env:"JWT_SECRET" envDefault:"dev-insecure-jwt-secret-change-me"`
+	AccessTokenTTL     time.Duration `env:"ACCESS_TOKEN_TTL" envDefault:"15m"`
+	RefreshTTLRemember time.Duration `env:"REFRESH_TTL_REMEMBER" envDefault:"744h"` // 31 days
+	RefreshTTLDefault  time.Duration `env:"REFRESH_TTL_DEFAULT" envDefault:"24h"`
+	BcryptCost         int           `env:"BCRYPT_COST" envDefault:"12"`
+
+	// Refresh-cookie and CORS settings for the browser SPA.
+	CookieDomain       string   `env:"COOKIE_DOMAIN" envDefault:""`
+	CookieSecure       bool     `env:"COOKIE_SECURE" envDefault:"true"`
+	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:","`
 
 	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 }
@@ -65,11 +85,26 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("parse environment: %w", err)
 	}
 
+	// A comma-separated env var can yield empty entries (e.g. an unset or
+	// trailing-comma value); drop them so validation and CORS see a clean list.
+	cfg.CORSAllowedOrigins = cleanOrigins(cfg.CORSAllowedOrigins)
+
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
 
 	return cfg, nil
+}
+
+// cleanOrigins trims whitespace and removes empty entries from a list of origins.
+func cleanOrigins(origins []string) []string {
+	cleaned := make([]string, 0, len(origins))
+	for _, o := range origins {
+		if o = strings.TrimSpace(o); o != "" {
+			cleaned = append(cleaned, o)
+		}
+	}
+	return cleaned
 }
 
 func (c Config) validate() error {
@@ -94,6 +129,46 @@ func (c Config) validate() error {
 	}
 	if c.MongoDatabase == "" {
 		return fmt.Errorf("MONGO_DATABASE must not be empty")
+	}
+
+	if err := c.validateAuth(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateAuth checks the authentication- and browser-facing settings.
+func (c Config) validateAuth() error {
+	if c.JWTSecret == "" {
+		return fmt.Errorf("JWT_SECRET must not be empty")
+	}
+	// The insecure development default must never be used to sign real tokens.
+	if c.IsProduction() && c.JWTSecret == devJWTSecret {
+		return fmt.Errorf("JWT_SECRET must be set to a strong secret in production")
+	}
+
+	if c.AccessTokenTTL <= 0 {
+		return fmt.Errorf("ACCESS_TOKEN_TTL must be positive")
+	}
+	if c.RefreshTTLRemember <= 0 {
+		return fmt.Errorf("REFRESH_TTL_REMEMBER must be positive")
+	}
+	if c.RefreshTTLDefault <= 0 {
+		return fmt.Errorf("REFRESH_TTL_DEFAULT must be positive")
+	}
+
+	// bcrypt accepts costs in [4, 31]; below 10 is too weak for passwords.
+	if c.BcryptCost < 10 || c.BcryptCost > 31 {
+		return fmt.Errorf("invalid BCRYPT_COST %d: must be in range 10-31", c.BcryptCost)
+	}
+
+	// The refresh cookie is sent with credentials, so a wildcard CORS origin is
+	// both insecure and rejected by browsers; require explicit origins.
+	for _, o := range c.CORSAllowedOrigins {
+		if o == "*" {
+			return fmt.Errorf("CORS_ALLOWED_ORIGINS must list explicit origins, not %q (credentialed requests forbid a wildcard)", o)
+		}
 	}
 
 	return nil

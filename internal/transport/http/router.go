@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"kibou/thisisyouryear/internal/service"
 )
 
 // RouterDeps carries the collaborators the router needs to serve requests.
@@ -14,6 +16,18 @@ import (
 type RouterDeps struct {
 	Logger *slog.Logger
 	Pinger Pinger
+
+	// Authentication collaborators. These may be nil in tests that only exercise
+	// the operational endpoints; the auth/user routes are wired regardless but
+	// only touch these when called.
+	AuthService   *service.AuthService
+	UserService   *service.UserService
+	TokenVerifier TokenVerifier
+	RefreshCookie RefreshCookieConfig
+
+	// CORSOrigins is the allow-list of browser origins. When empty, no CORS
+	// middleware is installed (same-origin only).
+	CORSOrigins []string
 }
 
 // NewRouter builds the application's HTTP handler: the shared middleware chain
@@ -34,15 +48,39 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(requestLogger(deps.Logger))
 	r.Use(middleware.Recoverer)
+	// CORS must run before the request timeout and route handlers so browser
+	// preflight (OPTIONS) is answered even for protected routes.
+	if len(deps.CORSOrigins) > 0 {
+		r.Use(corsMiddleware(deps.CORSOrigins))
+	}
 	r.Use(middleware.Timeout(30 * time.Second))
 
 	// Operational endpoints live outside the versioned API namespace.
 	r.Get("/healthz", healthHandler)
 	r.Get("/readyz", readinessHandler(deps.Pinger))
 
-	// Versioned API namespace. Feature route groups are mounted under here by
-	// later steps (e.g. r.Mount("/auth", authRouter)).
-	r.Route("/api/v1", func(_ chi.Router) {})
+	authHandler := NewAuthHandler(deps.AuthService, deps.RefreshCookie, deps.Logger)
+	userHandler := NewUserHandler(deps.UserService, deps.Logger)
+	authenticator := NewAuthenticator(deps.TokenVerifier, deps.Logger)
+
+	// Versioned API namespace. New feature route groups mount under here without
+	// altering existing groups.
+	r.Route("/api/v1", func(api chi.Router) {
+		// Public authentication routes.
+		api.Route("/auth", func(a chi.Router) {
+			a.Post("/register", authHandler.Register)
+			a.Post("/login", authHandler.Login)
+			a.Post("/refresh", authHandler.Refresh)
+			a.Post("/logout", authHandler.Logout)
+		})
+
+		// Authenticated routes. Every route added inside this group requires a
+		// valid access token; this is the template later features reuse.
+		api.Group(func(protected chi.Router) {
+			protected.Use(authenticator.Middleware)
+			protected.Get("/me", userHandler.Me)
+		})
+	})
 
 	return r
 }
