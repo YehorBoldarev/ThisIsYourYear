@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"kibou/thisisyouryear/internal/domain"
 )
 
 func TestGoalFlow_CRUDAndProgress(t *testing.T) {
@@ -147,12 +149,62 @@ func TestGoalFlow_Validation(t *testing.T) {
 // fakeObjectID is a syntactically valid but non-existent ObjectID hex.
 const fakeObjectID = "0123456789abcdef01234567"
 
-// topicProgress fetches a topic and returns its progress block.
-func topicProgress(t *testing.T, app *testApp, token, topicID string) ProgressResponse {
+// getTopic fetches a topic and returns its full response.
+func getTopic(t *testing.T, app *testApp, token, topicID string) TopicResponse {
 	t.Helper()
 	resp := app.doJSON(t, http.MethodGet, "/api/v1/topics/"+topicID, nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode, fmt.Sprintf("get topic %s", topicID))
 	var topic TopicResponse
 	decodeBody(t, resp, &topic)
-	return topic.Progress
+	return topic
+}
+
+// topicProgress fetches a topic and returns its progress block.
+func topicProgress(t *testing.T, app *testApp, token, topicID string) ProgressResponse {
+	t.Helper()
+	return getTopic(t, app, token, topicID).Progress
+}
+
+// TestGoalFlow_MotivationTracksProgress checks the motivational message moves
+// through the bands end-to-end as goals are completed, landing on the
+// celebratory copy at 100%.
+func TestGoalFlow_MotivationTracksProgress(t *testing.T) {
+	app := startApp(t)
+	token := app.registerAndLogin(t, "motivate@example.com")
+	topicID := app.createTopic(t, token, "Ship the year")
+
+	// No goals yet -> the no-goals message.
+	require.Equal(t,
+		domain.Motivate(domain.ComputeProgress(0, 0)),
+		getTopic(t, app, token, topicID).Motivation,
+		"no goals => no-goals message")
+
+	// Add two goals; still nothing done -> the "started" message.
+	var ids []string
+	for _, title := range []string{"Plan it", "Do it"} {
+		resp := app.doJSON(t, http.MethodPost, "/api/v1/topics/"+topicID+"/goals",
+			CreateGoalRequest{Title: title}, token)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		var g GoalResponse
+		decodeBody(t, resp, &g)
+		ids = append(ids, g.ID)
+	}
+	require.Equal(t,
+		domain.Motivate(domain.ComputeProgress(2, 0)),
+		getTopic(t, app, token, topicID).Motivation,
+		"goals but none done => started message")
+
+	// Complete every goal -> the celebratory complete message.
+	done := true
+	for _, id := range ids {
+		resp := app.doJSON(t, http.MethodPatch, "/api/v1/goals/"+id, UpdateGoalRequest{Done: &done}, token)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	}
+	final := getTopic(t, app, token, topicID)
+	require.InDelta(t, 1.0, final.Progress.Ratio, 1e-9)
+	require.Equal(t,
+		domain.Motivate(domain.ComputeProgress(2, 2)),
+		final.Motivation,
+		"all goals done => complete message")
 }

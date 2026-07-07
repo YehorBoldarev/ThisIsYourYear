@@ -81,15 +81,17 @@ func run() error {
 	userService := service.NewUserService(userRepo)
 	topicService := service.NewTopicService(topicRepo, goalRepo)
 	goalService := service.NewGoalService(goalRepo, topicRepo)
+	dashboardService := service.NewDashboardService(topicService, time.Now)
 
 	router := transporthttp.NewRouter(transporthttp.RouterDeps{
-		Logger:        logger,
-		Pinger:        mongoClient,
-		AuthService:   authService,
-		UserService:   userService,
-		TopicService:  topicService,
-		GoalService:   goalService,
-		TokenVerifier: tokenIssuer,
+		Logger:           logger,
+		Pinger:           mongoClient,
+		AuthService:      authService,
+		UserService:      userService,
+		TopicService:     topicService,
+		GoalService:      goalService,
+		DashboardService: dashboardService,
+		TokenVerifier:    tokenIssuer,
 		RefreshCookie: transporthttp.RefreshCookieConfig{
 			Name:   "refresh_token",
 			Path:   "/api/v1/auth",

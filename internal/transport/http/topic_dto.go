@@ -56,6 +56,7 @@ type TopicResponse struct {
 	Icon        string           `json:"icon"`
 	Archived    bool             `json:"archived"`
 	Progress    ProgressResponse `json:"progress"`
+	Motivation  string           `json:"motivation"`
 	CreatedAt   time.Time        `json:"createdAt"`
 	UpdatedAt   time.Time        `json:"updatedAt"`
 }
@@ -75,8 +76,9 @@ func topicResponse(v *service.TopicView) TopicResponse {
 			Completed: v.Progress.Completed,
 			Ratio:     v.Progress.Ratio,
 		},
-		CreatedAt: t.CreatedAt,
-		UpdatedAt: t.UpdatedAt,
+		Motivation: v.Motivation,
+		CreatedAt:  t.CreatedAt,
+		UpdatedAt:  t.UpdatedAt,
 	}
 }
 

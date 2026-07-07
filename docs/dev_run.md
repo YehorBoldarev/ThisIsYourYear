@@ -3,7 +3,7 @@
 How to run the backend on your machine, exercise it, and shut it down cleanly.
 
 > **Keep this current:** this document is updated at the end of every implementation
-> step. It reflects the app **as of Step 5 (Goals & Achievements)**.
+> step. It reflects the app **as of Step 7 (Dashboard)**.
 
 ---
 
@@ -118,7 +118,7 @@ make lint        # golangci-lint
 
 ### 3.3 Manual API smoke test
 
-Available endpoints as of Step 5 (all JSON, base path `/api/v1`):
+Available endpoints as of Step 7 (all JSON, base path `/api/v1`):
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
@@ -136,12 +136,23 @@ Available endpoints as of Step 5 (all JSON, base path `/api/v1`):
 | `GET`  | `/api/v1/topics/{id}/goals` | Bearer | list a topic's goals (ordered) |
 | `PATCH`| `/api/v1/goals/{id}` | Bearer | update a goal (`{"done":true}` to complete; `order` to reorder) |
 | `DELETE`| `/api/v1/goals/{id}` | Bearer | delete a goal |
+| `GET`  | `/api/v1/dashboard` | Bearer | year summary: aggregate progress, message, New-Year countdown |
 | `GET`  | `/healthz`, `/readyz` | — | liveness / readiness |
 
 Topics and goals are **owned by the caller**: another user's id returns `404`. The topic list
 is **year-scoped**, defaulting to the current year (`?year=YYYY` for others). A topic's
 `progress` (`{total, completed, ratio}`) is computed from its goals; completing a goal
 (`{"done":true}`) marks it an achievement and raises the ratio.
+
+Each topic response also carries a `motivation` string — an encouraging message derived from
+its live progress (no goals → "set your first goal…", partway → momentum copy, 100% → a
+celebratory 🎉). It is computed, never stored, so it always matches the current ratio.
+
+`GET /dashboard` is the landing summary for the caller's **current-year, non-archived** topics:
+aggregate `progress` (`{total, completed, ratio}` summed across all goals), a `topics`
+tally (`{total, completed}`), a positive `message` (a motivational empty-state line when there
+are no topics yet, otherwise the progress-derived band), and a `countdown` to the next New Year
+(`target` in UTC + `secondsRemaining`; the SPA localizes the target to the browser timezone).
 
 Run the API with `COOKIE_SECURE=false` first, then:
 
@@ -182,7 +193,11 @@ GID=$(curl -s -X POST $BASE/topics/$TID/goals -H "Authorization: Bearer $ACCESS"
 curl -s $BASE/topics/$TID/goals -H "Authorization: Bearer $ACCESS"      # list goals
 curl -s -X PATCH $BASE/goals/$GID -H "Authorization: Bearer $ACCESS" \
   -H 'Content-Type: application/json' -d '{"done":true}'                 # complete it
-curl -s $BASE/topics/$TID -H "Authorization: Bearer $ACCESS"           # progress ratio rose
+curl -s $BASE/topics/$TID -H "Authorization: Bearer $ACCESS"           # progress ratio rose;
+                                                                       # "motivation" reflects it
+
+# --- dashboard: aggregate summary + New-Year countdown ---
+curl -s $BASE/dashboard -H "Authorization: Bearer $ACCESS"             # message, progress, topics, countdown
 
 curl -s -X DELETE $BASE/topics/$TID -H "Authorization: Bearer $ACCESS" \
   -o /dev/null -w '%{http_code}\n'                                       # 204 (cascades goals)
@@ -229,6 +244,13 @@ rm -rf bin/             # created by `make build`
 
 ## Changelog
 
+- **Step 7 — Dashboard:** added `GET /dashboard` — the year's aggregate progress across
+  current, non-archived topics, a topic tally, a positive message (motivational empty state
+  when there are no topics), and a New-Year countdown (UTC target + seconds). Composes the
+  existing topic-list path; no new persistence.
+- **Step 6 — Motivation Engine:** each topic response now carries a computed
+  `motivation` message derived from its live progress (six bands from "no goals yet"
+  to a celebratory 100%); no new endpoints or dependencies.
 - **Step 5 — Goals & Achievements:** added goals under topics (create/list/edit/delete,
   mark done/undone, ordering), live topic progress, topic-delete cascade, the goal endpoint
   rows, and the goals smoke test.

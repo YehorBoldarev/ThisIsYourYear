@@ -118,6 +118,7 @@ func TestTopicService_CreateAndGet(t *testing.T) {
 	require.NotEmpty(t, view.Topic.ID)
 	require.Equal(t, 0, view.Progress.Total, "no goals yet => 0 progress")
 	require.InDelta(t, 0.0, view.Progress.Ratio, 1e-9)
+	require.Equal(t, domain.Motivate(view.Progress), view.Motivation, "motivation matches progress on create")
 
 	got, err := svc.Get(ctx, "user-1", view.Topic.ID)
 	require.NoError(t, err)
@@ -197,11 +198,13 @@ func TestTopicService_LiveProgress(t *testing.T) {
 	require.Equal(t, 4, got.Progress.Total)
 	require.Equal(t, 1, got.Progress.Completed)
 	require.InDelta(t, 0.25, got.Progress.Ratio, 1e-9)
+	require.Equal(t, domain.Motivate(got.Progress), got.Motivation, "motivation matches live progress on get")
 
 	list, err := svc.List(ctx, "u", nil, false)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.InDelta(t, 0.25, list[0].Progress.Ratio, 1e-9)
+	require.Equal(t, domain.Motivate(list[0].Progress), list[0].Motivation, "motivation matches live progress on list")
 }
 
 func TestTopicService_Delete_CascadesGoals(t *testing.T) {

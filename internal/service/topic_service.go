@@ -24,11 +24,23 @@ type TopicGoals interface {
 	DeleteByTopic(ctx context.Context, userID, topicID string) error
 }
 
-// TopicView is a topic together with its computed progress — the unit the
-// transport layer renders.
+// TopicView is a topic together with its computed progress and the encouraging
+// message derived from that progress — the unit the transport layer renders.
 type TopicView struct {
-	Topic    *domain.Topic
-	Progress domain.Progress
+	Topic      *domain.Topic
+	Progress   domain.Progress
+	Motivation string
+}
+
+// newTopicView pairs a topic with its progress and the motivational message for
+// that progress, keeping the message in lockstep with progress everywhere a view
+// is built.
+func newTopicView(topic *domain.Topic, progress domain.Progress) TopicView {
+	return TopicView{
+		Topic:      topic,
+		Progress:   progress,
+		Motivation: domain.Motivate(progress),
+	}
 }
 
 // TopicService implements the topic use-cases. All operations are keyed by the
@@ -54,7 +66,8 @@ func (s *TopicService) Create(ctx context.Context, userID, title, description st
 		return nil, err
 	}
 	// A brand-new topic has no goals yet, so its progress is 0% without a query.
-	return &TopicView{Topic: topic, Progress: domain.ComputeProgress(0, 0)}, nil
+	view := newTopicView(topic, domain.ComputeProgress(0, 0))
+	return &view, nil
 }
 
 // List returns the user's topics for a year (defaulting to the current year when
@@ -84,7 +97,7 @@ func (s *TopicService) List(ctx context.Context, userID string, year *int, inclu
 
 	views := make([]TopicView, 0, len(topics))
 	for i := range topics {
-		views = append(views, TopicView{Topic: &topics[i], Progress: progress[topics[i].ID]})
+		views = append(views, newTopicView(&topics[i], progress[topics[i].ID]))
 	}
 	return views, nil
 }
@@ -100,7 +113,8 @@ func (s *TopicService) Get(ctx context.Context, userID, id string) (*TopicView, 
 	if err != nil {
 		return nil, err
 	}
-	return &TopicView{Topic: topic, Progress: progress[topic.ID]}, nil
+	view := newTopicView(topic, progress[topic.ID])
+	return &view, nil
 }
 
 // Update applies a partial update to the user's topic and returns the fresh view.

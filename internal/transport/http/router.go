@@ -20,12 +20,13 @@ type RouterDeps struct {
 	// Authentication collaborators. These may be nil in tests that only exercise
 	// the operational endpoints; the auth/user routes are wired regardless but
 	// only touch these when called.
-	AuthService   *service.AuthService
-	UserService   *service.UserService
-	TopicService  *service.TopicService
-	GoalService   *service.GoalService
-	TokenVerifier TokenVerifier
-	RefreshCookie RefreshCookieConfig
+	AuthService      *service.AuthService
+	UserService      *service.UserService
+	TopicService     *service.TopicService
+	GoalService      *service.GoalService
+	DashboardService *service.DashboardService
+	TokenVerifier    TokenVerifier
+	RefreshCookie    RefreshCookieConfig
 
 	// CORSOrigins is the allow-list of browser origins. When empty, no CORS
 	// middleware is installed (same-origin only).
@@ -65,6 +66,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	userHandler := NewUserHandler(deps.UserService, deps.Logger)
 	topicHandler := NewTopicHandler(deps.TopicService, deps.Logger)
 	goalHandler := NewGoalHandler(deps.GoalService, deps.Logger)
+	dashboardHandler := NewDashboardHandler(deps.DashboardService, deps.Logger)
 	authenticator := NewAuthenticator(deps.TokenVerifier, deps.Logger)
 
 	// Versioned API namespace. New feature route groups mount under here without
@@ -98,6 +100,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 			protected.Get("/topics/{id}/goals", goalHandler.List)
 			protected.Patch("/goals/{id}", goalHandler.Update)
 			protected.Delete("/goals/{id}", goalHandler.Delete)
+
+			// Landing summary: aggregate progress + message + New-Year countdown.
+			protected.Get("/dashboard", dashboardHandler.Get)
 		})
 	})
 

@@ -27,6 +27,8 @@ func TestTopicFlow_CRUD(t *testing.T) {
 	require.Equal(t, "Get fit", created.Title)
 	require.Equal(t, domain.CurrentYear(), created.Year, "year defaults to current")
 	require.Equal(t, 0, created.Progress.Total, "no goals yet")
+	require.Equal(t, domain.Motivate(domain.ComputeProgress(0, 0)), created.Motivation,
+		"a topic with no goals carries the no-goals message")
 	require.False(t, created.Archived)
 
 	// Get.

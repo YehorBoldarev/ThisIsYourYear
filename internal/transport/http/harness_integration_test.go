@@ -63,14 +63,16 @@ func startApp(t *testing.T) *testApp {
 		service.AuthConfig{RefreshTTLRemember: 744 * time.Hour, RefreshTTLDefault: 24 * time.Hour},
 	)
 
+	topicService := service.NewTopicService(topicRepo, goalRepo)
 	router := NewRouter(RouterDeps{
-		Logger:        quietLogger(),
-		Pinger:        client,
-		AuthService:   authService,
-		UserService:   service.NewUserService(userRepo),
-		TopicService:  service.NewTopicService(topicRepo, goalRepo),
-		GoalService:   service.NewGoalService(goalRepo, topicRepo),
-		TokenVerifier: tokens,
+		Logger:           quietLogger(),
+		Pinger:           client,
+		AuthService:      authService,
+		UserService:      service.NewUserService(userRepo),
+		TopicService:     topicService,
+		GoalService:      service.NewGoalService(goalRepo, topicRepo),
+		DashboardService: service.NewDashboardService(topicService, time.Now),
+		TokenVerifier:    tokens,
 		// Secure=false so the cookie jar sends the refresh cookie over the
 		// httptest http:// server (a Secure cookie is withheld on plain HTTP).
 		RefreshCookie: RefreshCookieConfig{Name: refreshCookieName, Path: "/api/v1/auth", Secure: false},
