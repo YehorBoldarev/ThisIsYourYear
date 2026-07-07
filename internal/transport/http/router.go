@@ -22,6 +22,8 @@ type RouterDeps struct {
 	// only touch these when called.
 	AuthService   *service.AuthService
 	UserService   *service.UserService
+	TopicService  *service.TopicService
+	GoalService   *service.GoalService
 	TokenVerifier TokenVerifier
 	RefreshCookie RefreshCookieConfig
 
@@ -61,6 +63,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	authHandler := NewAuthHandler(deps.AuthService, deps.RefreshCookie, deps.Logger)
 	userHandler := NewUserHandler(deps.UserService, deps.Logger)
+	topicHandler := NewTopicHandler(deps.TopicService, deps.Logger)
+	goalHandler := NewGoalHandler(deps.GoalService, deps.Logger)
 	authenticator := NewAuthenticator(deps.TokenVerifier, deps.Logger)
 
 	// Versioned API namespace. New feature route groups mount under here without
@@ -79,6 +83,21 @@ func NewRouter(deps RouterDeps) http.Handler {
 		api.Group(func(protected chi.Router) {
 			protected.Use(authenticator.Middleware)
 			protected.Get("/me", userHandler.Me)
+
+			protected.Post("/topics", topicHandler.Create)
+			protected.Get("/topics", topicHandler.List)
+			protected.Get("/topics/{id}", topicHandler.Get)
+			protected.Patch("/topics/{id}", topicHandler.Update)
+			protected.Delete("/topics/{id}", topicHandler.Delete)
+
+			// Goals live under their topic for creation/listing; individual
+			// goals are addressed directly. {id} is the topic id on the nested
+			// routes (kept consistent with the topic routes to avoid a chi
+			// wildcard-name conflict).
+			protected.Post("/topics/{id}/goals", goalHandler.Create)
+			protected.Get("/topics/{id}/goals", goalHandler.List)
+			protected.Patch("/goals/{id}", goalHandler.Update)
+			protected.Delete("/goals/{id}", goalHandler.Delete)
 		})
 	})
 

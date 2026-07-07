@@ -3,7 +3,7 @@
 How to run the backend on your machine, exercise it, and shut it down cleanly.
 
 > **Keep this current:** this document is updated at the end of every implementation
-> step. It reflects the app **as of Step 3 (Auth & Users)**.
+> step. It reflects the app **as of Step 5 (Goals & Achievements)**.
 
 ---
 
@@ -118,7 +118,7 @@ make lint        # golangci-lint
 
 ### 3.3 Manual API smoke test
 
-Available endpoints as of Step 3 (all JSON, base path `/api/v1`):
+Available endpoints as of Step 5 (all JSON, base path `/api/v1`):
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
@@ -127,7 +127,21 @@ Available endpoints as of Step 3 (all JSON, base path `/api/v1`):
 | `POST` | `/api/v1/auth/refresh` | refresh cookie | rotate & renew tokens |
 | `POST` | `/api/v1/auth/logout` | refresh cookie | revoke session, clear cookie |
 | `GET`  | `/api/v1/me` | Bearer access token | current user profile |
+| `POST` | `/api/v1/topics` | Bearer | create a topic |
+| `GET`  | `/api/v1/topics` | Bearer | list my topics (`?year=YYYY`, `?includeArchived=true`) |
+| `GET`  | `/api/v1/topics/{id}` | Bearer | get one of my topics (+ computed progress) |
+| `PATCH`| `/api/v1/topics/{id}` | Bearer | update (partial; `{"archived":true}` to archive) |
+| `DELETE`| `/api/v1/topics/{id}` | Bearer | delete a topic (cascades its goals) |
+| `POST` | `/api/v1/topics/{id}/goals` | Bearer | add a goal to a topic |
+| `GET`  | `/api/v1/topics/{id}/goals` | Bearer | list a topic's goals (ordered) |
+| `PATCH`| `/api/v1/goals/{id}` | Bearer | update a goal (`{"done":true}` to complete; `order` to reorder) |
+| `DELETE`| `/api/v1/goals/{id}` | Bearer | delete a goal |
 | `GET`  | `/healthz`, `/readyz` | — | liveness / readiness |
+
+Topics and goals are **owned by the caller**: another user's id returns `404`. The topic list
+is **year-scoped**, defaulting to the current year (`?year=YYYY` for others). A topic's
+`progress` (`{total, completed, ratio}`) is computed from its goals; completing a goal
+(`{"done":true}`) marks it an achievement and raises the ratio.
 
 Run the API with `COOKIE_SECURE=false` first, then:
 
@@ -147,8 +161,33 @@ ACCESS=$(curl -s -c "$JAR" -X POST $BASE/auth/login -H 'Content-Type: applicatio
 # call a protected endpoint with the access token
 curl -s $BASE/me -H "Authorization: Bearer $ACCESS"
 
-# refresh (cookie sent automatically), then log out
-curl -s -b "$JAR" -c "$JAR" -X POST $BASE/auth/refresh
+# --- topics (need a fresh access token; refresh above rotated it) ---
+ACCESS=$(curl -s -c "$JAR" -X POST $BASE/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"password123"}' \
+  | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+
+# create a topic (year defaults to the current year)
+TID=$(curl -s -X POST $BASE/topics -H "Authorization: Bearer $ACCESS" \
+  -H 'Content-Type: application/json' -d '{"title":"Get fit","color":"#aabbcc","icon":"🏃"}' \
+  | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+curl -s $BASE/topics -H "Authorization: Bearer $ACCESS"                 # list (current year)
+curl -s -X PATCH $BASE/topics/$TID -H "Authorization: Bearer $ACCESS" \
+  -H 'Content-Type: application/json' -d '{"title":"Get very fit"}'      # partial update
+
+# --- goals under the topic ---
+GID=$(curl -s -X POST $BASE/topics/$TID/goals -H "Authorization: Bearer $ACCESS" \
+  -H 'Content-Type: application/json' -d '{"title":"Run 5k"}' \
+  | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+curl -s $BASE/topics/$TID/goals -H "Authorization: Bearer $ACCESS"      # list goals
+curl -s -X PATCH $BASE/goals/$GID -H "Authorization: Bearer $ACCESS" \
+  -H 'Content-Type: application/json' -d '{"done":true}'                 # complete it
+curl -s $BASE/topics/$TID -H "Authorization: Bearer $ACCESS"           # progress ratio rose
+
+curl -s -X DELETE $BASE/topics/$TID -H "Authorization: Bearer $ACCESS" \
+  -o /dev/null -w '%{http_code}\n'                                       # 204 (cascades goals)
+
+# log out
 curl -s -b "$JAR" -c "$JAR" -X POST $BASE/auth/logout -o /dev/null -w '%{http_code}\n'  # 204
 ```
 
@@ -190,6 +229,11 @@ rm -rf bin/             # created by `make build`
 
 ## Changelog
 
+- **Step 5 — Goals & Achievements:** added goals under topics (create/list/edit/delete,
+  mark done/undone, ordering), live topic progress, topic-delete cascade, the goal endpoint
+  rows, and the goals smoke test.
+- **Step 4 — Topics:** added user-owned Topics CRUD (year-scoped list, archive), the topics
+  endpoint rows, and the topics smoke test.
 - **Step 3 — Auth & Users:** added auth/user endpoints, JWT + refresh-cookie config vars,
   and the manual auth smoke test.
 - **Step 1–2:** initial local-run, health checks, MongoDB via compose, unit/integration tests.

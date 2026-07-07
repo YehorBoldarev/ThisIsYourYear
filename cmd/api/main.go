@@ -65,6 +65,8 @@ func run() error {
 	// before EnsureIndexes runs.
 	userRepo := repository.NewUserRepository(mongoClient, time.Now)
 	sessionRepo := repository.NewSessionRepository(mongoClient, time.Now)
+	topicRepo := repository.NewTopicRepository(mongoClient, time.Now)
+	goalRepo := repository.NewGoalRepository(mongoClient, time.Now)
 
 	if err := mongoClient.EnsureIndexes(ctx); err != nil {
 		return err
@@ -77,12 +79,16 @@ func run() error {
 		RefreshTTLDefault:  cfg.RefreshTTLDefault,
 	})
 	userService := service.NewUserService(userRepo)
+	topicService := service.NewTopicService(topicRepo, goalRepo)
+	goalService := service.NewGoalService(goalRepo, topicRepo)
 
 	router := transporthttp.NewRouter(transporthttp.RouterDeps{
 		Logger:        logger,
 		Pinger:        mongoClient,
 		AuthService:   authService,
 		UserService:   userService,
+		TopicService:  topicService,
+		GoalService:   goalService,
 		TokenVerifier: tokenIssuer,
 		RefreshCookie: transporthttp.RefreshCookieConfig{
 			Name:   "refresh_token",

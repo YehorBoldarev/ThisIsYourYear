@@ -47,8 +47,12 @@ func startApp(t *testing.T) *testApp {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = client.Disconnect(context.Background()) })
 
+	// All repositories register their indexes on construction, so build them
+	// before EnsureIndexes runs.
 	userRepo := repository.NewUserRepository(client, time.Now)
 	sessionRepo := repository.NewSessionRepository(client, time.Now)
+	topicRepo := repository.NewTopicRepository(client, time.Now)
+	goalRepo := repository.NewGoalRepository(client, time.Now)
 	require.NoError(t, client.EnsureIndexes(ctx))
 
 	tokens := auth.NewTokenIssuer("integration-secret", 15*time.Minute)
@@ -64,6 +68,8 @@ func startApp(t *testing.T) *testApp {
 		Pinger:        client,
 		AuthService:   authService,
 		UserService:   service.NewUserService(userRepo),
+		TopicService:  service.NewTopicService(topicRepo, goalRepo),
+		GoalService:   service.NewGoalService(goalRepo, topicRepo),
 		TokenVerifier: tokens,
 		// Secure=false so the cookie jar sends the refresh cookie over the
 		// httptest http:// server (a Secure cookie is withheld on plain HTTP).
@@ -127,4 +133,35 @@ func decodeBody(t *testing.T, resp *http.Response, dst any) {
 	t.Helper()
 	defer resp.Body.Close()
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(dst))
+}
+
+// registerAndLogin creates an account and returns a valid bearer access token for
+// it. Each call uses its own client so different users don't share a cookie jar.
+func (a *testApp) registerAndLogin(t *testing.T, email string) string {
+	t.Helper()
+	resp := a.doJSON(t, http.MethodPost, "/api/v1/auth/register", RegisterRequest{
+		Email: email, DisplayName: "User", Password: "password123",
+	}, "")
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+
+	resp = a.doJSON(t, http.MethodPost, "/api/v1/auth/login", LoginRequest{
+		Email: email, Password: "password123",
+	}, "")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var login TokenResponse
+	decodeBody(t, resp, &login)
+	require.NotEmpty(t, login.AccessToken)
+	return login.AccessToken
+}
+
+// createTopic creates a topic and returns its id.
+func (a *testApp) createTopic(t *testing.T, token, title string) string {
+	t.Helper()
+	resp := a.doJSON(t, http.MethodPost, "/api/v1/topics", CreateTopicRequest{Title: title}, token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	var topic TopicResponse
+	decodeBody(t, resp, &topic)
+	require.NotEmpty(t, topic.ID)
+	return topic.ID
 }
