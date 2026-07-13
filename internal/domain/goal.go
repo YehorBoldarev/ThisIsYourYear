@@ -23,16 +23,18 @@ const (
 // Goal is a concrete, achievable step under a Topic. A goal with status "done"
 // (and a completedAt) is what the product calls an achievement.
 type Goal struct {
-	ID          string
-	TopicID     string
-	UserID      string
-	Title       string
-	Notes       string
-	Status      GoalStatus
-	CompletedAt *time.Time
-	Order       int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID            string
+	TopicID       string
+	UserID        string
+	Title         string
+	Notes         string
+	Status        GoalStatus
+	CompletedAt   *time.Time
+	Order         int
+	DueDate       *time.Time // optional deadline, date-only (UTC midnight)
+	IsAchievement bool       // when done, celebrate this milestone as an achievement (★)
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // IsAchieved reports whether the goal has been completed.
@@ -41,7 +43,7 @@ func (g *Goal) IsAchieved() bool { return g.Status == GoalStatusDone }
 // NewGoal constructs a valid, not-yet-completed goal under a topic. Order is
 // assigned by the caller (the service appends it to the topic's list). Text is
 // trimmed and validated; violations are ErrValidation.
-func NewGoal(userID, topicID, title, notes string) (*Goal, error) {
+func NewGoal(userID, topicID, title, notes string, isAchievement bool, dueDate *time.Time) (*Goal, error) {
 	title = strings.TrimSpace(title)
 	notes = strings.TrimSpace(notes)
 
@@ -59,11 +61,13 @@ func NewGoal(userID, topicID, title, notes string) (*Goal, error) {
 	}
 
 	return &Goal{
-		UserID:  userID,
-		TopicID: topicID,
-		Title:   title,
-		Notes:   notes,
-		Status:  GoalStatusTodo,
+		UserID:        userID,
+		TopicID:       topicID,
+		Title:         title,
+		Notes:         notes,
+		Status:        GoalStatusTodo,
+		DueDate:       dateOnlyUTC(dueDate),
+		IsAchievement: isAchievement,
 	}, nil
 }
 
@@ -71,15 +75,27 @@ func NewGoal(userID, topicID, title, notes string) (*Goal, error) {
 // is the completion lever — true marks the goal an achievement (stamping
 // completedAt), false reverts it to todo (clearing completedAt).
 type GoalUpdate struct {
-	Title *string
-	Notes *string
-	Done  *bool
-	Order *int
+	Title         *string
+	Notes         *string
+	Done          *bool
+	Order         *int
+	DueDate       FieldUpdate[time.Time]
+	IsAchievement *bool
 }
 
 // IsEmpty reports whether the update would change nothing.
 func (u GoalUpdate) IsEmpty() bool {
-	return u.Title == nil && u.Notes == nil && u.Done == nil && u.Order == nil
+	return u.Title == nil && u.Notes == nil && u.Done == nil && u.Order == nil &&
+		!u.DueDate.Present && u.IsAchievement == nil
+}
+
+// NormalizedDueDate returns the due-date update normalized to date-only UTC when
+// a value is being set.
+func (u GoalUpdate) NormalizedDueDate() FieldUpdate[time.Time] {
+	if u.DueDate.Present && u.DueDate.Value != nil {
+		return FieldUpdate[time.Time]{Present: true, Value: dateOnlyUTC(u.DueDate.Value)}
+	}
+	return u.DueDate
 }
 
 // Validate checks every supplied field against the same rules as NewGoal.

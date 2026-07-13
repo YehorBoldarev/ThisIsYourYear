@@ -14,7 +14,7 @@ import (
 
 func newGoal(t *testing.T, userID, topicID, title string, order int) *domain.Goal {
 	t.Helper()
-	g, err := domain.NewGoal(userID, topicID, title, "")
+	g, err := domain.NewGoal(userID, topicID, title, "", false, nil)
 	require.NoError(t, err)
 	g.Order = order
 	return g

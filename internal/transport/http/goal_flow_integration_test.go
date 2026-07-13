@@ -81,6 +81,42 @@ func TestGoalFlow_CRUDAndProgress(t *testing.T) {
 	require.Len(t, goals, 2)
 }
 
+// TestGoalFlow_DesignFields round-trips the milestone due date and the
+// isAchievement flag through create, read, and PATCH (toggle + clear).
+func TestGoalFlow_DesignFields(t *testing.T) {
+	app := startApp(t)
+	token := app.registerAndLogin(t, "fields-goal@example.com")
+	topicID := app.createTopic(t, token, "Get fit")
+
+	// Create a milestone flagged as an achievement, with a due date.
+	resp := app.doJSON(t, http.MethodPost, "/api/v1/topics/"+topicID+"/goals", CreateGoalRequest{
+		Title: "Complete a 15K training run", DueDate: "09-08-2026", IsAchievement: true,
+	}, token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	var created GoalResponse
+	decodeBody(t, resp, &created)
+	require.Equal(t, "09-08-2026", created.DueDate)
+	require.True(t, created.IsAchievement)
+
+	// Toggle the achievement flag off and clear the due date in one PATCH.
+	flagOff := false
+	resp = app.doJSON(t, http.MethodPatch, "/api/v1/goals/"+created.ID, UpdateGoalRequest{
+		IsAchievement: &flagOff, DueDate: clearingDate(),
+	}, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var patched GoalResponse
+	decodeBody(t, resp, &patched)
+	require.False(t, patched.IsAchievement)
+	require.Empty(t, patched.DueDate, "empty string clears the due date")
+
+	// An invalid date is rejected.
+	resp = app.doJSON(t, http.MethodPost, "/api/v1/topics/"+topicID+"/goals", CreateGoalRequest{
+		Title: "Bad date", DueDate: "9 Aug 2026",
+	}, token)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	resp.Body.Close()
+}
+
 func TestGoalFlow_TopicDeleteCascades(t *testing.T) {
 	app := startApp(t)
 	token := app.registerAndLogin(t, "cascade@example.com")

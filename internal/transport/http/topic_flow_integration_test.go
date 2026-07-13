@@ -120,6 +120,50 @@ func TestTopicFlow_OwnershipIsolation(t *testing.T) {
 	require.Equal(t, "Alice's plan", stillThere.Title)
 }
 
+// TestTopicFlow_DesignFields round-trips the design-driven fields (category and
+// the DD-MM-YYYY target date) through create, read, patch-change, and clear.
+func TestTopicFlow_DesignFields(t *testing.T) {
+	app := startApp(t)
+	token := app.registerAndLogin(t, "fields-topic@example.com")
+
+	// Create with a category and a target date.
+	resp := app.doJSON(t, http.MethodPost, "/api/v1/topics", CreateTopicRequest{
+		Title: "Run a Half-Marathon", Category: "Health & fitness", TargetDate: "31-12-2026",
+	}, token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	var created TopicResponse
+	decodeBody(t, resp, &created)
+	require.Equal(t, "Health & fitness", created.Category)
+	require.Equal(t, "31-12-2026", created.TargetDate)
+
+	// Change the target date via PATCH.
+	resp = app.doJSON(t, http.MethodPatch, "/api/v1/topics/"+created.ID, UpdateTopicRequest{
+		TargetDate: settingDate("04-10-2026"),
+	}, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var patched TopicResponse
+	decodeBody(t, resp, &patched)
+	require.Equal(t, "04-10-2026", patched.TargetDate)
+	require.Equal(t, "Health & fitness", patched.Category, "unspecified fields are unchanged")
+
+	// Clear the target date by sending an empty string.
+	resp = app.doJSON(t, http.MethodPatch, "/api/v1/topics/"+created.ID, UpdateTopicRequest{
+		TargetDate: clearingDate(),
+	}, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var cleared TopicResponse
+	decodeBody(t, resp, &cleared)
+	require.Empty(t, cleared.TargetDate, "empty string clears the target date")
+
+	// An invalid date format is rejected.
+	bad := "2026-12-31"
+	resp = app.doJSON(t, http.MethodPost, "/api/v1/topics", CreateTopicRequest{
+		Title: "Bad date", TargetDate: bad,
+	}, token)
+	require.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+	resp.Body.Close()
+}
+
 func TestTopicFlow_Unauthenticated(t *testing.T) {
 	app := startApp(t)
 	resp := app.doJSON(t, http.MethodGet, "/api/v1/topics", nil, "")

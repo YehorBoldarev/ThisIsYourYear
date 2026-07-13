@@ -30,6 +30,10 @@ func TestLoad_Defaults(t *testing.T) {
 	require.Equal(t, 12, cfg.BcryptCost)
 	require.True(t, cfg.CookieSecure)
 	require.Empty(t, cfg.CORSAllowedOrigins)
+
+	// Rate-limit defaults.
+	require.Equal(t, 20, cfg.RateLimitAuthRequests)
+	require.Equal(t, time.Minute, cfg.RateLimitAuthWindow)
 }
 
 func TestLoad_Overrides(t *testing.T) {
@@ -66,6 +70,7 @@ func TestLoad_InvalidValues(t *testing.T) {
 		"bcrypt cost too high": {"BCRYPT_COST": "40"},
 		"prod default secret":  {"APP_ENV": "production", "JWT_SECRET": "dev-insecure-jwt-secret-change-me"},
 		"wildcard cors origin": {"CORS_ALLOWED_ORIGINS": "*"},
+		"negative rate limit":  {"RATE_LIMIT_AUTH_REQUESTS": "-1"},
 	}
 
 	for name, overrides := range tests {
@@ -120,6 +125,24 @@ func TestValidate(t *testing.T) {
 	prodDefaultSecret.AppEnv = EnvProduction
 	prodDefaultSecret.JWTSecret = devJWTSecret
 	require.Error(t, prodDefaultSecret.validate())
+
+	// Rate limiting: disabled (0 requests) is valid regardless of window.
+	disabledLimit := base()
+	disabledLimit.RateLimitAuthRequests = 0
+	disabledLimit.RateLimitAuthWindow = 0
+	require.NoError(t, disabledLimit.validate())
+
+	// Enabled but missing a window is invalid.
+	enabledNoWindow := base()
+	enabledNoWindow.RateLimitAuthRequests = 5
+	enabledNoWindow.RateLimitAuthWindow = 0
+	require.Error(t, enabledNoWindow.validate())
+
+	// Enabled with a positive window is valid.
+	enabledOK := base()
+	enabledOK.RateLimitAuthRequests = 5
+	enabledOK.RateLimitAuthWindow = time.Minute
+	require.NoError(t, enabledOK.validate())
 }
 
 // clearKnownEnv unsets every environment variable the config reads so a test
@@ -134,7 +157,7 @@ func clearKnownEnv(t *testing.T) {
 		"MONGO_TIMEOUT", "LOG_LEVEL",
 		"JWT_SECRET", "ACCESS_TOKEN_TTL", "REFRESH_TTL_REMEMBER",
 		"REFRESH_TTL_DEFAULT", "BCRYPT_COST", "COOKIE_DOMAIN", "COOKIE_SECURE",
-		"CORS_ALLOWED_ORIGINS",
+		"CORS_ALLOWED_ORIGINS", "RATE_LIMIT_AUTH_REQUESTS", "RATE_LIMIT_AUTH_WINDOW",
 	} {
 		original, existed := os.LookupEnv(key)
 		require.NoError(t, os.Unsetenv(key))

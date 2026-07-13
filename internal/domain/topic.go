@@ -12,6 +12,7 @@ const (
 	TopicTitleMaxLen       = 120
 	TopicDescriptionMaxLen = 2000
 	TopicIconMaxLen        = 64
+	TopicCategoryMaxLen    = 60
 
 	minTopicYear = 2000
 	maxTopicYear = 2100
@@ -31,6 +32,8 @@ type Topic struct {
 	Year        int
 	Color       string
 	Icon        string
+	Category    string
+	TargetDate  *time.Time // optional deadline, date-only (UTC midnight)
 	ArchivedAt  *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -43,11 +46,12 @@ func (t *Topic) IsArchived() bool { return t.ArchivedAt != nil }
 // year defaults to the current UTC year when zero, and all invariants are
 // enforced; violations are reported as ErrValidation. The returned topic has no
 // ID or timestamps until it is persisted.
-func NewTopic(userID, title, description string, year int, color, icon string) (*Topic, error) {
+func NewTopic(userID, title, description string, year int, color, icon, category string, targetDate *time.Time) (*Topic, error) {
 	title = strings.TrimSpace(title)
 	description = strings.TrimSpace(description)
 	color = strings.TrimSpace(color)
 	icon = strings.TrimSpace(icon)
+	category = strings.TrimSpace(category)
 
 	if userID == "" {
 		return nil, fmt.Errorf("%w: userID is required", ErrValidation)
@@ -59,6 +63,9 @@ func NewTopic(userID, title, description string, year int, color, icon string) (
 		return nil, err
 	}
 	if err := validateOptionalText("icon", icon, TopicIconMaxLen); err != nil {
+		return nil, err
+	}
+	if err := validateOptionalText("category", category, TopicCategoryMaxLen); err != nil {
 		return nil, err
 	}
 	if err := validateColor(color); err != nil {
@@ -78,6 +85,8 @@ func NewTopic(userID, title, description string, year int, color, icon string) (
 		Year:        year,
 		Color:       color,
 		Icon:        icon,
+		Category:    category,
+		TargetDate:  dateOnlyUTC(targetDate),
 	}, nil
 }
 
@@ -91,12 +100,15 @@ type TopicUpdate struct {
 	Color       *string
 	Icon        *string
 	Archived    *bool
+	Category    *string
+	TargetDate  FieldUpdate[time.Time]
 }
 
 // IsEmpty reports whether the update would change nothing.
 func (u TopicUpdate) IsEmpty() bool {
 	return u.Title == nil && u.Description == nil && u.Year == nil &&
-		u.Color == nil && u.Icon == nil && u.Archived == nil
+		u.Color == nil && u.Icon == nil && u.Archived == nil &&
+		u.Category == nil && !u.TargetDate.Present
 }
 
 // Validate checks every supplied field against the same rules as NewTopic.
@@ -121,12 +133,26 @@ func (u TopicUpdate) Validate() error {
 			return err
 		}
 	}
+	if u.Category != nil {
+		if err := validateOptionalText("category", strings.TrimSpace(*u.Category), TopicCategoryMaxLen); err != nil {
+			return err
+		}
+	}
 	if u.Year != nil {
 		if err := ValidateYear(*u.Year); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// NormalizedTargetDate returns the target-date update normalized to date-only
+// UTC when a value is being set, so storage and construction agree on the shape.
+func (u TopicUpdate) NormalizedTargetDate() FieldUpdate[time.Time] {
+	if u.TargetDate.Present && u.TargetDate.Value != nil {
+		return FieldUpdate[time.Time]{Present: true, Value: dateOnlyUTC(u.TargetDate.Value)}
+	}
+	return u.TargetDate
 }
 
 // ValidateYear checks a year is within the accepted range.

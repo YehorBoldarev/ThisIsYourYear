@@ -3,7 +3,7 @@
 How to run the backend on your machine, exercise it, and shut it down cleanly.
 
 > **Keep this current:** this document is updated at the end of every implementation
-> step. It reflects the app **as of Step 7 (Dashboard)**.
+> step. It reflects the app **as of Step 9 (Design data extensions)**.
 
 ---
 
@@ -72,6 +72,8 @@ for a local run. Common overrides:
 | `COOKIE_SECURE` | `true` | **set `false` for local HTTP** so the refresh cookie is sent over `http://` |
 | `COOKIE_DOMAIN` | empty | cookie domain; empty = host-only |
 | `CORS_ALLOWED_ORIGINS` | empty | comma-separated SPA origins (no `*`, credentials are used) |
+| `RATE_LIMIT_AUTH_REQUESTS` | `20` | max auth requests per window per client IP; **`0` disables** rate limiting |
+| `RATE_LIMIT_AUTH_WINDOW` | `1m` | the rate-limit window duration |
 
 Example with overrides:
 
@@ -118,7 +120,7 @@ make lint        # golangci-lint
 
 ### 3.3 Manual API smoke test
 
-Available endpoints as of Step 7 (all JSON, base path `/api/v1`):
+Available endpoints as of Step 9 (all JSON, base path `/api/v1`):
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
@@ -137,6 +139,7 @@ Available endpoints as of Step 7 (all JSON, base path `/api/v1`):
 | `PATCH`| `/api/v1/goals/{id}` | Bearer | update a goal (`{"done":true}` to complete; `order` to reorder) |
 | `DELETE`| `/api/v1/goals/{id}` | Bearer | delete a goal |
 | `GET`  | `/api/v1/dashboard` | Bearer | year summary: aggregate progress, message, New-Year countdown |
+| `GET`  | `/openapi.yaml` | — | the OpenAPI 3.1 contract (served as `application/yaml`) |
 | `GET`  | `/healthz`, `/readyz` | — | liveness / readiness |
 
 Topics and goals are **owned by the caller**: another user's id returns `404`. The topic list
@@ -148,11 +151,28 @@ Each topic response also carries a `motivation` string — an encouraging messag
 its live progress (no goals → "set your first goal…", partway → momentum copy, 100% → a
 celebratory 🎉). It is computed, never stored, so it always matches the current ratio.
 
+Topics and goals also carry optional **design fields** (added for the frontend): a topic has a
+`category` and a `targetDate`; a goal (milestone) has a `dueDate` and an `isAchievement` flag (the
+"celebrate as an achievement ★" toggle). **Dates use `DD-MM-YYYY`** (e.g. `"31-12-2026"`) — a
+calendar date, no time-of-day. On `PATCH`, a date is left unchanged when omitted, **cleared with an
+empty string** `""`, or set with a `DD-MM-YYYY` value; an invalid format returns `422`.
+
 `GET /dashboard` is the landing summary for the caller's **current-year, non-archived** topics:
 aggregate `progress` (`{total, completed, ratio}` summed across all goals), a `topics`
 tally (`{total, completed}`), a positive `message` (a motivational empty-state line when there
 are no topics yet, otherwise the progress-derived band), and a `countdown` to the next New Year
 (`target` in UTC + `secondsRemaining`; the SPA localizes the target to the browser timezone).
+
+`GET /openapi.yaml` serves the checked-in **OpenAPI 3.1** contract (`api/openapi.yaml`, embedded
+in the binary) as `application/yaml` — the source of truth for the API shape and the basis for
+generating the React client. It needs no authentication.
+
+The public **auth endpoints** (`/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`)
+are **rate limited per client IP** (default 20 requests / minute; see `RATE_LIMIT_AUTH_*` above).
+Exceeding the limit returns `429` with `{"error":{"code":"rate_limited",...}}` and a `Retry-After`
+header (whole seconds until the window resets). Set `RATE_LIMIT_AUTH_REQUESTS=0` to disable it.
+Health probes are never throttled. The limiter keys on the direct connection IP (not
+`X-Forwarded-For`); behind a trusted proxy this should be revisited.
 
 Run the API with `COOKIE_SECURE=false` first, then:
 
@@ -179,7 +199,8 @@ ACCESS=$(curl -s -c "$JAR" -X POST $BASE/auth/login -H 'Content-Type: applicatio
 
 # create a topic (year defaults to the current year)
 TID=$(curl -s -X POST $BASE/topics -H "Authorization: Bearer $ACCESS" \
-  -H 'Content-Type: application/json' -d '{"title":"Get fit","color":"#aabbcc","icon":"🏃"}' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Get fit","color":"#aabbcc","icon":"🏃","category":"Health","targetDate":"31-12-2026"}' \
   | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 
 curl -s $BASE/topics -H "Authorization: Bearer $ACCESS"                 # list (current year)
@@ -188,7 +209,7 @@ curl -s -X PATCH $BASE/topics/$TID -H "Authorization: Bearer $ACCESS" \
 
 # --- goals under the topic ---
 GID=$(curl -s -X POST $BASE/topics/$TID/goals -H "Authorization: Bearer $ACCESS" \
-  -H 'Content-Type: application/json' -d '{"title":"Run 5k"}' \
+  -H 'Content-Type: application/json' -d '{"title":"Run 5k","dueDate":"09-08-2026","isAchievement":true}' \
   | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 curl -s $BASE/topics/$TID/goals -H "Authorization: Bearer $ACCESS"      # list goals
 curl -s -X PATCH $BASE/goals/$GID -H "Authorization: Bearer $ACCESS" \
@@ -198,6 +219,9 @@ curl -s $BASE/topics/$TID -H "Authorization: Bearer $ACCESS"           # progres
 
 # --- dashboard: aggregate summary + New-Year countdown ---
 curl -s $BASE/dashboard -H "Authorization: Bearer $ACCESS"             # message, progress, topics, countdown
+
+# --- the API contract (no auth) ---
+curl -s localhost:8080/openapi.yaml | head -3                          # openapi: 3.1.0 ...
 
 curl -s -X DELETE $BASE/topics/$TID -H "Authorization: Bearer $ACCESS" \
   -o /dev/null -w '%{http_code}\n'                                       # 204 (cascades goals)
@@ -244,6 +268,15 @@ rm -rf bin/             # created by `make build`
 
 ## Changelog
 
+- **Step 9 — Design data extensions:** added the optional fields the design handoff needs —
+  Topic `category` + `targetDate`, Goal `dueDate` + `isAchievement` — settable on create and
+  `PATCH` (omit = unchanged, `""` = clear, `DD-MM-YYYY` = set), returned in responses, and
+  documented in `api/openapi.yaml`. Additive and backward-compatible; no new endpoints.
+
+- **Step 8 — Hardening:** added per-IP rate limiting on the public auth endpoints
+  (`RATE_LIMIT_AUTH_*`, `429` + `Retry-After`, `0` disables); published the checked-in
+  **OpenAPI 3.1** contract (`api/openapi.yaml`, embedded and served at `GET /openapi.yaml`);
+  and locked the error contract with an end-to-end suite covering `401/404/409/422/429/405`.
 - **Step 7 — Dashboard:** added `GET /dashboard` — the year's aggregate progress across
   current, non-archived topics, a topic tally, a positive message (motivational empty state
   when there are no topics), and a New-Year countdown (UTC target + seconds). Composes the

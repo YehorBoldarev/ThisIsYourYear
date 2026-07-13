@@ -109,12 +109,12 @@ func TestGoalService_CreateAppendsOrder(t *testing.T) {
 	svc := newGoalService("u")
 	ctx := context.Background()
 
-	g0, err := svc.Create(ctx, "u", "topic-1", "First", "")
+	g0, err := svc.Create(ctx, "u", "topic-1", CreateGoalInput{Title: "First"})
 	require.NoError(t, err)
 	require.Equal(t, 0, g0.Order)
 	require.Equal(t, domain.GoalStatusTodo, g0.Status)
 
-	g1, err := svc.Create(ctx, "u", "topic-1", "Second", "")
+	g1, err := svc.Create(ctx, "u", "topic-1", CreateGoalInput{Title: "Second"})
 	require.NoError(t, err)
 	require.Equal(t, 1, g1.Order, "new goals are appended at the end")
 }
@@ -124,18 +124,18 @@ func TestGoalService_Create_TopicNotOwned(t *testing.T) {
 	ctx := context.Background()
 
 	// Wrong user for the topic.
-	_, err := svc.Create(ctx, "intruder", "topic-1", "X", "")
+	_, err := svc.Create(ctx, "intruder", "topic-1", CreateGoalInput{Title: "X"})
 	require.ErrorIs(t, err, domain.ErrNotFound)
 
 	// Unknown topic.
-	_, err = svc.Create(ctx, "owner", "topic-other", "X", "")
+	_, err = svc.Create(ctx, "owner", "topic-other", CreateGoalInput{Title: "X"})
 	require.ErrorIs(t, err, domain.ErrNotFound)
 }
 
 func TestGoalService_MarkDoneAndUndone(t *testing.T) {
 	svc := newGoalService("u")
 	ctx := context.Background()
-	g, err := svc.Create(ctx, "u", "topic-1", "Run", "")
+	g, err := svc.Create(ctx, "u", "topic-1", CreateGoalInput{Title: "Run"})
 	require.NoError(t, err)
 
 	done := true
@@ -152,7 +152,7 @@ func TestGoalService_MarkDoneAndUndone(t *testing.T) {
 func TestGoalService_Update_EmptyIsValidationError(t *testing.T) {
 	svc := newGoalService("u")
 	ctx := context.Background()
-	g, err := svc.Create(ctx, "u", "topic-1", "Run", "")
+	g, err := svc.Create(ctx, "u", "topic-1", CreateGoalInput{Title: "Run"})
 	require.NoError(t, err)
 
 	_, err = svc.Update(ctx, "u", g.ID, domain.GoalUpdate{})
@@ -162,7 +162,7 @@ func TestGoalService_Update_EmptyIsValidationError(t *testing.T) {
 func TestGoalService_OwnershipIsolation(t *testing.T) {
 	svc := newGoalService("owner")
 	ctx := context.Background()
-	g, err := svc.Create(ctx, "owner", "topic-1", "Private", "")
+	g, err := svc.Create(ctx, "owner", "topic-1", CreateGoalInput{Title: "Private"})
 	require.NoError(t, err)
 
 	newTitle := "Hijacked"

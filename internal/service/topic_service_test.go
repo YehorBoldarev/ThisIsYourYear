@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -113,7 +114,10 @@ func TestTopicService_CreateAndGet(t *testing.T) {
 	svc, _ := newTopicService()
 	ctx := context.Background()
 
-	view, err := svc.Create(ctx, "user-1", "Get fit", "", 2026, "", "")
+	target := time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC)
+	view, err := svc.Create(ctx, "user-1", CreateTopicInput{
+		Title: "Get fit", Year: 2026, Category: "Health", TargetDate: &target,
+	})
 	require.NoError(t, err)
 	require.NotEmpty(t, view.Topic.ID)
 	require.Equal(t, 0, view.Progress.Total, "no goals yet => 0 progress")
@@ -123,12 +127,15 @@ func TestTopicService_CreateAndGet(t *testing.T) {
 	got, err := svc.Get(ctx, "user-1", view.Topic.ID)
 	require.NoError(t, err)
 	require.Equal(t, "Get fit", got.Topic.Title)
+	require.Equal(t, "Health", got.Topic.Category, "category persists")
+	require.NotNil(t, got.Topic.TargetDate)
+	require.Equal(t, target, *got.Topic.TargetDate, "target date persists")
 }
 
 func TestTopicService_OwnershipIsolation(t *testing.T) {
 	svc, _ := newTopicService()
 	ctx := context.Background()
-	view, err := svc.Create(ctx, "owner", "Mine", "", 2026, "", "")
+	view, err := svc.Create(ctx, "owner", CreateTopicInput{Title: "Mine", Year: 2026})
 	require.NoError(t, err)
 
 	// Another user cannot read, update, or delete it.
@@ -146,9 +153,9 @@ func TestTopicService_OwnershipIsolation(t *testing.T) {
 func TestTopicService_List_DefaultsToCurrentYear(t *testing.T) {
 	svc, _ := newTopicService()
 	ctx := context.Background()
-	_, err := svc.Create(ctx, "u", "This year", "", domain.CurrentYear(), "", "")
+	_, err := svc.Create(ctx, "u", CreateTopicInput{Title: "This year", Year: domain.CurrentYear()})
 	require.NoError(t, err)
-	_, err = svc.Create(ctx, "u", "Old year", "", 2020, "", "")
+	_, err = svc.Create(ctx, "u", CreateTopicInput{Title: "Old year", Year: 2020})
 	require.NoError(t, err)
 
 	current, err := svc.List(ctx, "u", nil, false)
@@ -166,7 +173,7 @@ func TestTopicService_List_DefaultsToCurrentYear(t *testing.T) {
 func TestTopicService_Update_EmptyIsValidationError(t *testing.T) {
 	svc, _ := newTopicService()
 	ctx := context.Background()
-	view, err := svc.Create(ctx, "u", "T", "", 2026, "", "")
+	view, err := svc.Create(ctx, "u", CreateTopicInput{Title: "T", Year: 2026})
 	require.NoError(t, err)
 
 	_, err = svc.Update(ctx, "u", view.Topic.ID, domain.TopicUpdate{})
@@ -176,7 +183,7 @@ func TestTopicService_Update_EmptyIsValidationError(t *testing.T) {
 func TestTopicService_Update_RejectsInvalidFields(t *testing.T) {
 	svc, _ := newTopicService()
 	ctx := context.Background()
-	view, err := svc.Create(ctx, "u", "T", "", 2026, "", "")
+	view, err := svc.Create(ctx, "u", CreateTopicInput{Title: "T", Year: 2026})
 	require.NoError(t, err)
 
 	empty := ""
@@ -187,7 +194,7 @@ func TestTopicService_Update_RejectsInvalidFields(t *testing.T) {
 func TestTopicService_LiveProgress(t *testing.T) {
 	svc, goals := newTopicService()
 	ctx := context.Background()
-	view, err := svc.Create(ctx, "u", "Get fit", "", 2026, "", "")
+	view, err := svc.Create(ctx, "u", CreateTopicInput{Title: "Get fit", Year: 2026})
 	require.NoError(t, err)
 
 	// Simulate 1 of 4 goals done for this topic.
@@ -210,7 +217,7 @@ func TestTopicService_LiveProgress(t *testing.T) {
 func TestTopicService_Delete_CascadesGoals(t *testing.T) {
 	svc, goals := newTopicService()
 	ctx := context.Background()
-	view, err := svc.Create(ctx, "u", "Doomed", "", 2026, "", "")
+	view, err := svc.Create(ctx, "u", CreateTopicInput{Title: "Doomed", Year: 2026})
 	require.NoError(t, err)
 
 	require.NoError(t, svc.Delete(ctx, "u", view.Topic.ID))
@@ -220,7 +227,7 @@ func TestTopicService_Delete_CascadesGoals(t *testing.T) {
 func TestTopicService_Delete_NotOwned_DoesNotCascade(t *testing.T) {
 	svc, goals := newTopicService()
 	ctx := context.Background()
-	view, err := svc.Create(ctx, "owner", "Mine", "", 2026, "", "")
+	view, err := svc.Create(ctx, "owner", CreateTopicInput{Title: "Mine", Year: 2026})
 	require.NoError(t, err)
 
 	err = svc.Delete(ctx, "intruder", view.Topic.ID)

@@ -48,11 +48,11 @@ func TestDashboardService_AggregatesAcrossTopics(t *testing.T) {
 	ctx := context.Background()
 
 	// Three current-year topics with mixed progress: 1/4, 0/2, and 3/3 (complete).
-	a, err := topicSvc.Create(ctx, "u", "A", "", domain.CurrentYear(), "", "")
+	a, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "A", Year: domain.CurrentYear()})
 	require.NoError(t, err)
-	b, err := topicSvc.Create(ctx, "u", "B", "", domain.CurrentYear(), "", "")
+	b, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "B", Year: domain.CurrentYear()})
 	require.NoError(t, err)
-	c, err := topicSvc.Create(ctx, "u", "C", "", domain.CurrentYear(), "", "")
+	c, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "C", Year: domain.CurrentYear()})
 	require.NoError(t, err)
 
 	goals.counts[a.Topic.ID] = domain.ComputeProgress(4, 1)
@@ -73,9 +73,9 @@ func TestDashboardService_ExcludesOtherYearsAndArchived(t *testing.T) {
 	dash, topicSvc, _ := newDashboardService()
 	ctx := context.Background()
 
-	_, err := topicSvc.Create(ctx, "u", "This year", "", domain.CurrentYear(), "", "")
+	_, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "This year", Year: domain.CurrentYear()})
 	require.NoError(t, err)
-	_, err = topicSvc.Create(ctx, "u", "Old year", "", 2020, "", "")
+	_, err = topicSvc.Create(ctx, "u", CreateTopicInput{Title: "Old year", Year: 2020})
 	require.NoError(t, err)
 
 	view, err := dash.Get(ctx, "u")

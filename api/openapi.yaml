@@ -1,0 +1,809 @@
+openapi: 3.1.0
+info:
+  title: ThisIsYourYear API
+  version: "1.0.0"
+  description: |
+    HTTP contract for the ThisIsYourYear backend — a multi-user yearly-goals
+    tracker. Users own Topics (big yearly goals); under each Topic they create
+    Goals; completing a Goal makes it an achievement and raises the Topic's
+    computed progress. A motivational message is derived from progress, and the
+    dashboard aggregates the year plus a New-Year countdown.
+
+    All application endpoints live under `/api/v1` and exchange JSON. Every
+    non-auth route is owned by the authenticated caller; another user's resource
+    id returns `404`. Errors share a single envelope (see the `Error` schema).
+servers:
+  - url: /
+    description: The service root (operational endpoints at the root, the API under /api/v1).
+
+tags:
+  - name: auth
+    description: Registration, login, refresh, and logout.
+  - name: users
+    description: The authenticated user's profile.
+  - name: topics
+    description: Yearly big-goal topics owned by the caller.
+  - name: goals
+    description: Concrete sub-goals under a topic; completing one is an achievement.
+  - name: dashboard
+    description: Aggregate year summary and New-Year countdown.
+  - name: ops
+    description: Operational endpoints (health, readiness, API contract).
+
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      summary: Create an account
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: The created user's public profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Log in
+      description: |
+        Authenticates the user, sets the HttpOnly refresh cookie, and returns a
+        short-lived access token for the `Authorization: Bearer` header.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Access token plus the user profile. Sets the refresh cookie.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/RefreshCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate the refresh session
+      description: |
+        Reads the refresh cookie, rotates the session, and returns a new access
+        token (and a new refresh cookie). On any failure the cookie is cleared.
+      operationId: refresh
+      security:
+        - refreshCookie: []
+      responses:
+        "200":
+          description: A fresh access token. Sets a rotated refresh cookie.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/RefreshCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Log out
+      description: Revokes the current refresh session and clears the cookie. Idempotent.
+      operationId: logout
+      security:
+        - refreshCookie: []
+      responses:
+        "204":
+          description: Logged out; the refresh cookie is cleared.
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/me:
+    get:
+      tags: [users]
+      summary: Current user profile
+      operationId: getMe
+      responses:
+        "200":
+          description: The authenticated user's public profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/topics:
+    get:
+      tags: [topics]
+      summary: List my topics
+      description: Lists the caller's topics for a year (defaults to the current year).
+      operationId: listTopics
+      parameters:
+        - name: year
+          in: query
+          description: Filter to this year. Defaults to the current year when omitted.
+          required: false
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+        - name: includeArchived
+          in: query
+          description: Include archived topics in the result.
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The caller's topics, each with computed progress and motivation.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Topic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [topics]
+      summary: Create a topic
+      operationId: createTopic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTopicRequest"
+      responses:
+        "201":
+          description: The created topic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Topic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/topics/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TopicId"
+    get:
+      tags: [topics]
+      summary: Get one topic
+      operationId: getTopic
+      responses:
+        "200":
+          description: The topic, with computed progress and motivation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Topic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [topics]
+      summary: Update a topic (partial)
+      description: |
+        Only supplied fields change. Send `{"archived": true}` to archive.
+      operationId: updateTopic
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTopicRequest"
+      responses:
+        "200":
+          description: The updated topic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Topic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [topics]
+      summary: Delete a topic
+      description: Deletes the topic and cascades to its goals.
+      operationId: deleteTopic
+      responses:
+        "204":
+          description: Deleted (goals cascaded).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/topics/{id}/goals:
+    parameters:
+      - $ref: "#/components/parameters/TopicId"
+    get:
+      tags: [goals]
+      summary: List a topic's goals
+      operationId: listGoals
+      responses:
+        "200":
+          description: The topic's goals, in display order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [goals]
+      summary: Add a goal to a topic
+      operationId: createGoal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: The created goal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/goals/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The goal id.
+        schema:
+          type: string
+    patch:
+      tags: [goals]
+      summary: Update a goal (partial)
+      description: |
+        Only supplied fields change. Send `{"done": true}` to complete it (an
+        achievement) or `{"done": false}` to reopen it; `order` reorders.
+      operationId: updateGoal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGoalRequest"
+      responses:
+        "200":
+          description: The updated goal.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [goals]
+      summary: Delete a goal
+      operationId: deleteGoal
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/dashboard:
+    get:
+      tags: [dashboard]
+      summary: Year summary
+      description: |
+        Aggregates the caller's current-year, non-archived topics: overall
+        progress, a topic tally, a positive message, and a New-Year countdown.
+      operationId: getDashboard
+      responses:
+        "200":
+          description: The aggregate year summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /healthz:
+    get:
+      tags: [ops]
+      summary: Liveness probe
+      operationId: healthz
+      security: []
+      responses:
+        "200":
+          description: The process is live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /readyz:
+    get:
+      tags: [ops]
+      summary: Readiness probe
+      description: Reports ready only when downstream dependencies (MongoDB) are reachable.
+      operationId: readyz
+      security: []
+      responses:
+        "200":
+          description: Ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: A dependency is unreachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /openapi.yaml:
+    get:
+      tags: [ops]
+      summary: This OpenAPI document
+      operationId: openapi
+      security: []
+      responses:
+        "200":
+          description: The OpenAPI 3.1 contract, as YAML.
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived access token returned by login/refresh.
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: HttpOnly refresh-session cookie set by login and rotated by refresh.
+
+  parameters:
+    TopicId:
+      name: id
+      in: path
+      required: true
+      description: The topic id.
+      schema:
+        type: string
+
+  headers:
+    RefreshCookie:
+      description: The HttpOnly, SameSite=Lax refresh-session cookie.
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The resource does not exist or is not owned by the caller.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: The resource already exists (e.g. the email is taken).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: The request body failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Too many requests from this client; retry after the given delay.
+      headers:
+        Retry-After:
+          description: Whole seconds until the rate-limit window resets.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      description: The single error envelope returned by every failing request.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: A stable, machine-readable error code.
+              examples: [validation_error, unauthorized, not_found, conflict, rate_limited, internal_error]
+            message:
+              type: string
+              description: A human-readable summary. Never leaks internal detail.
+            fields:
+              type: object
+              description: Per-field messages, present on validation errors.
+              additionalProperties:
+                type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, displayName, password]
+      properties:
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          maxLength: 100
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        rememberMe:
+          type: boolean
+          default: false
+          description: When true, issues a long-lived (31-day) refresh session.
+
+    User:
+      type: object
+      required: [id, email, displayName, createdAt]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TokenResponse:
+      type: object
+      required: [accessToken, expiresAt, user]
+      properties:
+        accessToken:
+          type: string
+          description: Bearer access token for the Authorization header.
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the access token expires.
+        user:
+          $ref: "#/components/schemas/User"
+
+    Progress:
+      type: object
+      description: Computed completion of a topic (never stored).
+      required: [total, completed, ratio]
+      properties:
+        total:
+          type: integer
+          description: Number of goals.
+        completed:
+          type: integer
+          description: Number of completed goals.
+        ratio:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: completed / total, or 0 when there are no goals.
+
+    CreateTopicRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        year:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+          description: Optional; defaults to the current year.
+        color:
+          type: string
+          description: Hex color, e.g. "#aabbcc".
+        icon:
+          type: string
+          maxLength: 64
+        category:
+          type: string
+          maxLength: 60
+          description: Optional grouping label, e.g. "Health & fitness".
+        targetDate:
+          type: string
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+          example: "31-12-2026"
+          description: Optional deadline, calendar date in DD-MM-YYYY form.
+
+    UpdateTopicRequest:
+      type: object
+      description: Partial update; only supplied fields change.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        year:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+        color:
+          type: string
+        icon:
+          type: string
+          maxLength: 64
+        archived:
+          type: boolean
+        category:
+          type: string
+          maxLength: 60
+        targetDate:
+          type: string
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+          example: "31-12-2026"
+          description: Omit to leave unchanged, empty string to clear, DD-MM-YYYY to set.
+
+    Topic:
+      type: object
+      required: [id, title, description, year, color, icon, category, targetDate, archived, progress, motivation, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+          description: Grouping label; empty when unset.
+        targetDate:
+          type: string
+          description: Optional deadline in DD-MM-YYYY form; empty when unset.
+        archived:
+          type: boolean
+        progress:
+          $ref: "#/components/schemas/Progress"
+        motivation:
+          type: string
+          description: Encouraging message derived from the topic's live progress.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateGoalRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 5000
+        dueDate:
+          type: string
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+          example: "09-08-2026"
+          description: Optional deadline, calendar date in DD-MM-YYYY form.
+        isAchievement:
+          type: boolean
+          default: false
+          description: When done, celebrate this milestone as an achievement (★).
+
+    UpdateGoalRequest:
+      type: object
+      description: Partial update; only supplied fields change.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        notes:
+          type: string
+          maxLength: 5000
+        done:
+          type: boolean
+          description: true completes the milestone; false reopens it.
+        order:
+          type: integer
+          minimum: 0
+        dueDate:
+          type: string
+          pattern: '^\d{2}-\d{2}-\d{4}$'
+          example: "09-08-2026"
+          description: Omit to leave unchanged, empty string to clear, DD-MM-YYYY to set.
+        isAchievement:
+          type: boolean
+          description: Toggle whether the milestone is celebrated as an achievement (★).
+
+    Goal:
+      type: object
+      required: [id, topicId, title, notes, status, order, isAchievement, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        topicId:
+          type: string
+        title:
+          type: string
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [todo, done]
+        completedAt:
+          type: string
+          format: date-time
+          description: Present only when the goal is done.
+        order:
+          type: integer
+        dueDate:
+          type: string
+          description: Optional deadline in DD-MM-YYYY form; empty when unset.
+        isAchievement:
+          type: boolean
+          description: Whether this milestone is celebrated as an achievement (★).
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TopicTally:
+      type: object
+      required: [total, completed]
+      properties:
+        total:
+          type: integer
+          description: How many topics are in scope.
+        completed:
+          type: integer
+          description: How many of those are 100% complete.
+
+    Countdown:
+      type: object
+      required: [target, secondsRemaining]
+      properties:
+        target:
+          type: string
+          format: date-time
+          description: The next New Year instant, in UTC. Clients localize it.
+        secondsRemaining:
+          type: integer
+          format: int64
+          description: Whole seconds until the target (floored at 0).
+
+    Dashboard:
+      type: object
+      required: [year, message, progress, topics, countdown]
+      properties:
+        year:
+          type: integer
+          description: The year this dashboard summarizes.
+        message:
+          type: string
+          description: A positive message; a distinct empty-state line when there are no topics.
+        progress:
+          $ref: "#/components/schemas/Progress"
+        topics:
+          $ref: "#/components/schemas/TopicTally"
+        countdown:
+          $ref: "#/components/schemas/Countdown"
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          examples: [ok, ready, unavailable]
+        reason:
+          type: string
+          description: Present when a probe reports a problem.
+
+security:
+  - bearerAuth: []

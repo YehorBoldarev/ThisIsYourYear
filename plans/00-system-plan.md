@@ -185,15 +185,20 @@ Every non‑auth route is owned by the authenticated user; cross‑user access i
 6. **Motivation engine** — threshold→message mapping, surfaced on topic view.
 7. **Dashboard endpoint** — aggregate progress, positive message, New‑Year countdown data.
 8. **Hardening** — rate limiting, full OpenAPI spec, end‑to‑end tests, error‑path coverage.
+9. **Design data extensions** — additive API fields the design handoff requires: Topic
+   `category` + `targetDate`, Goal `dueDate` + `isAchievement` (the ✓-vs-★ flag). Domain +
+   repo + service + DTOs + OpenAPI + tests. *Closes the design ↔ API gap before the frontend.*
 
-**Phase B — Frontend** (begins after you provide designs)
+**Phase B — Frontend** (detailed roadmap in [`plans/frontend/00-system-plan.md`](./frontend/00-system-plan.md))
 
-9. React + Tailwind app scaffold, design system, routing, auth flow, API client.
-10. Topics & Goals UI, Dashboard UI, accessibility pass, responsive/adaptive polish.
+10. Frontend foundation — React + Vite + TS + Tailwind scaffold, design‑system/tokens (both
+    themes), app shell, routing, API client, auth flow.
+11. Feature UI — Dashboard, Topic/Goal flows, Achievements, celebration + motivation system,
+    accessibility pass, responsive/adaptive polish.
 
 **Phase C — Delivery**
 
-11. Production Docker images, compose/orchestration, env/secrets, deployment runbook.
+12. Production Docker images, compose/orchestration, env/secrets, deployment runbook.
 
 ---
 

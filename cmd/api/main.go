@@ -99,6 +99,10 @@ func run() error {
 			Secure: cfg.CookieSecure,
 		},
 		CORSOrigins: cfg.CORSAllowedOrigins,
+		RateLimit: transporthttp.RateLimitConfig{
+			AuthRequests: cfg.RateLimitAuthRequests,
+			AuthWindow:   cfg.RateLimitAuthWindow,
+		},
 	})
 
 	server := transporthttp.NewServer(transporthttp.ServerConfig{

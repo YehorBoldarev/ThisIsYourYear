@@ -40,7 +40,7 @@ func (h *TopicHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondError(w, h.logger, r, err)
 		return
 	}
-	view, err := h.svc.Create(r.Context(), userID, req.Title, req.Description, req.Year, req.Color, req.Icon)
+	view, err := h.svc.Create(r.Context(), userID, req.toInput())
 	if err != nil {
 		respondError(w, h.logger, r, err)
 		return

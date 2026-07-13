@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"kibou/thisisyouryear/internal/domain"
 )
@@ -35,13 +36,21 @@ func NewGoalService(goals GoalRepository, topics TopicOwnershipReader) *GoalServ
 	return &GoalService{goals: goals, topics: topics}
 }
 
+// CreateGoalInput carries the fields for creating a milestone under a topic.
+type CreateGoalInput struct {
+	Title         string
+	Notes         string
+	DueDate       *time.Time
+	IsAchievement bool
+}
+
 // Create adds a goal to one of the caller's topics, appended at the end of the
 // list. A topic the caller does not own yields domain.ErrNotFound.
-func (s *GoalService) Create(ctx context.Context, userID, topicID, title, notes string) (*domain.Goal, error) {
+func (s *GoalService) Create(ctx context.Context, userID, topicID string, in CreateGoalInput) (*domain.Goal, error) {
 	if err := s.assertOwnsTopic(ctx, userID, topicID); err != nil {
 		return nil, err
 	}
-	goal, err := domain.NewGoal(userID, topicID, title, notes)
+	goal, err := domain.NewGoal(userID, topicID, in.Title, in.Notes, in.IsAchievement, in.DueDate)
 	if err != nil {
 		return nil, err
 	}

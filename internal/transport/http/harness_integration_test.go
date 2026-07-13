@@ -32,7 +32,16 @@ type testApp struct {
 	client *http.Client
 }
 
+// startApp starts the full service with auth rate limiting disabled, which is
+// what every flow test wants (they register/login many users in quick
+// succession). Tests that need throttling use startAppWithRateLimit.
 func startApp(t *testing.T) *testApp {
+	return startAppWithRateLimit(t, RateLimitConfig{})
+}
+
+// startAppWithRateLimit starts the full service with the given auth rate-limit
+// configuration (a zero value disables limiting).
+func startAppWithRateLimit(t *testing.T, rl RateLimitConfig) *testApp {
 	t.Helper()
 	ctx := context.Background()
 
@@ -73,6 +82,7 @@ func startApp(t *testing.T) *testApp {
 		GoalService:      service.NewGoalService(goalRepo, topicRepo),
 		DashboardService: service.NewDashboardService(topicService, time.Now),
 		TokenVerifier:    tokens,
+		RateLimit:        rl,
 		// Secure=false so the cookie jar sends the refresh cookie over the
 		// httptest http:// server (a Secure cookie is withheld on plain HTTP).
 		RefreshCookie: RefreshCookieConfig{Name: refreshCookieName, Path: "/api/v1/auth", Secure: false},
@@ -155,6 +165,18 @@ func (a *testApp) registerAndLogin(t *testing.T, email string) string {
 	decodeBody(t, resp, &login)
 	require.NotEmpty(t, login.AccessToken)
 	return login.AccessToken
+}
+
+// settingDate builds a request date field that sets the given DD-MM-YYYY value.
+func settingDate(s string) *optionalDate {
+	t, _ := time.Parse(dateLayout, s)
+	t = t.UTC()
+	return &optionalDate{value: &t}
+}
+
+// clearingDate builds a request date field that clears the value (sends "").
+func clearingDate() *optionalDate {
+	return &optionalDate{}
 }
 
 // createTopic creates a topic and returns its id.

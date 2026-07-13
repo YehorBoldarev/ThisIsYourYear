@@ -57,6 +57,13 @@ type Config struct {
 	CookieSecure       bool     `env:"COOKIE_SECURE" envDefault:"true"`
 	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:","`
 
+	// Rate limiting for the public auth endpoints, applied per client IP. A
+	// request count of 0 disables limiting entirely (used by tests and by anyone
+	// who wants to opt out). The defaults are generous for a human but stop
+	// automated brute-force against register/login/refresh.
+	RateLimitAuthRequests int           `env:"RATE_LIMIT_AUTH_REQUESTS" envDefault:"20"`
+	RateLimitAuthWindow   time.Duration `env:"RATE_LIMIT_AUTH_WINDOW" envDefault:"1m"`
+
 	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -133,6 +140,15 @@ func (c Config) validate() error {
 
 	if err := c.validateAuth(); err != nil {
 		return err
+	}
+
+	// Rate limiting: a negative count is nonsensical; 0 is the explicit "off"
+	// switch. A positive count needs a positive window to divide requests into.
+	if c.RateLimitAuthRequests < 0 {
+		return fmt.Errorf("invalid RATE_LIMIT_AUTH_REQUESTS %d: must be >= 0 (0 disables limiting)", c.RateLimitAuthRequests)
+	}
+	if c.RateLimitAuthRequests > 0 && c.RateLimitAuthWindow <= 0 {
+		return fmt.Errorf("RATE_LIMIT_AUTH_WINDOW must be positive when rate limiting is enabled")
 	}
 
 	return nil

@@ -31,6 +31,17 @@ type RouterDeps struct {
 	// CORSOrigins is the allow-list of browser origins. When empty, no CORS
 	// middleware is installed (same-origin only).
 	CORSOrigins []string
+
+	// RateLimit configures per-IP throttling of the public auth endpoints. When
+	// RateLimit.AuthRequests is 0, no auth rate limiting is installed.
+	RateLimit RateLimitConfig
+}
+
+// RateLimitConfig describes the per-IP fixed-window limit applied to the public
+// auth endpoints. AuthRequests == 0 disables limiting.
+type RateLimitConfig struct {
+	AuthRequests int
+	AuthWindow   time.Duration
 }
 
 // NewRouter builds the application's HTTP handler: the shared middleware chain
@@ -61,6 +72,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// Operational endpoints live outside the versioned API namespace.
 	r.Get("/healthz", healthHandler)
 	r.Get("/readyz", readinessHandler(deps.Pinger))
+	// The API contract is published (unauthenticated) for client tooling.
+	r.Get("/openapi.yaml", openapiHandler)
 
 	authHandler := NewAuthHandler(deps.AuthService, deps.RefreshCookie, deps.Logger)
 	userHandler := NewUserHandler(deps.UserService, deps.Logger)
@@ -72,8 +85,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// Versioned API namespace. New feature route groups mount under here without
 	// altering existing groups.
 	r.Route("/api/v1", func(api chi.Router) {
-		// Public authentication routes.
+		// Public authentication routes. These are the abuse-prone, unauthenticated
+		// surface, so they carry a per-IP rate limit when one is configured.
 		api.Route("/auth", func(a chi.Router) {
+			if deps.RateLimit.AuthRequests > 0 {
+				limiter := newRateLimiter(deps.RateLimit.AuthRequests, deps.RateLimit.AuthWindow, nil)
+				a.Use(limiter.middleware)
+			}
 			a.Post("/register", authHandler.Register)
 			a.Post("/login", authHandler.Login)
 			a.Post("/refresh", authHandler.Refresh)

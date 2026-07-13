@@ -14,7 +14,7 @@ import (
 
 func newTopic(t *testing.T, userID, title string, year int) *domain.Topic {
 	t.Helper()
-	topic, err := domain.NewTopic(userID, title, "", year, "", "")
+	topic, err := domain.NewTopic(userID, title, "", year, "", "", "", nil)
 	require.NoError(t, err)
 	return topic
 }

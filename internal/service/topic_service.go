@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"kibou/thisisyouryear/internal/domain"
 )
@@ -56,9 +57,21 @@ func NewTopicService(topics TopicRepository, goals TopicGoals) *TopicService {
 	return &TopicService{topics: topics, goals: goals}
 }
 
+// CreateTopicInput carries the fields for creating a topic. Grouping them keeps
+// the service and handler call sites readable as the field set grows.
+type CreateTopicInput struct {
+	Title       string
+	Description string
+	Year        int
+	Color       string
+	Icon        string
+	Category    string
+	TargetDate  *time.Time
+}
+
 // Create validates and persists a new topic for the user.
-func (s *TopicService) Create(ctx context.Context, userID, title, description string, year int, color, icon string) (*TopicView, error) {
-	topic, err := domain.NewTopic(userID, title, description, year, color, icon)
+func (s *TopicService) Create(ctx context.Context, userID string, in CreateTopicInput) (*TopicView, error) {
+	topic, err := domain.NewTopic(userID, in.Title, in.Description, in.Year, in.Color, in.Icon, in.Category, in.TargetDate)
 	if err != nil {
 		return nil, err
 	}

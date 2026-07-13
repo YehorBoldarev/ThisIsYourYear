@@ -24,20 +24,24 @@ type goalDoc struct {
 	Status         string             `bson:"status"`
 	CompletedAt    *time.Time         `bson:"completedAt,omitempty"`
 	Order          int                `bson:"order"`
+	DueDate        *time.Time         `bson:"dueDate,omitempty"`
+	IsAchievement  bool               `bson:"isAchievement"`
 }
 
 func (d *goalDoc) toDomain() *domain.Goal {
 	return &domain.Goal{
-		ID:          mongo.HexFromID(d.ID),
-		TopicID:     mongo.HexFromID(d.TopicID),
-		UserID:      mongo.HexFromID(d.UserID),
-		Title:       d.Title,
-		Notes:       d.Notes,
-		Status:      domain.GoalStatus(d.Status),
-		CompletedAt: d.CompletedAt,
-		Order:       d.Order,
-		CreatedAt:   d.CreatedAt,
-		UpdatedAt:   d.UpdatedAt,
+		ID:            mongo.HexFromID(d.ID),
+		TopicID:       mongo.HexFromID(d.TopicID),
+		UserID:        mongo.HexFromID(d.UserID),
+		Title:         d.Title,
+		Notes:         d.Notes,
+		Status:        domain.GoalStatus(d.Status),
+		CompletedAt:   d.CompletedAt,
+		Order:         d.Order,
+		DueDate:       d.DueDate,
+		IsAchievement: d.IsAchievement,
+		CreatedAt:     d.CreatedAt,
+		UpdatedAt:     d.UpdatedAt,
 	}
 }
 
@@ -74,13 +78,15 @@ func (r *GoalRepository) Create(ctx context.Context, g *domain.Goal) error {
 		return err
 	}
 	doc := &goalDoc{
-		TopicID:     tid,
-		UserID:      uid,
-		Title:       g.Title,
-		Notes:       g.Notes,
-		Status:      string(g.Status),
-		CompletedAt: g.CompletedAt,
-		Order:       g.Order,
+		TopicID:       tid,
+		UserID:        uid,
+		Title:         g.Title,
+		Notes:         g.Notes,
+		Status:        string(g.Status),
+		CompletedAt:   g.CompletedAt,
+		Order:         g.Order,
+		DueDate:       g.DueDate,
+		IsAchievement: g.IsAchievement,
 	}
 	if err := r.repo.Insert(ctx, doc); err != nil {
 		return err
@@ -265,6 +271,13 @@ func goalUpdateFields(u domain.GoalUpdate) bson.M {
 	}
 	if u.Order != nil {
 		fields["order"] = *u.Order
+	}
+	if u.IsAchievement != nil {
+		fields["isAchievement"] = *u.IsAchievement
+	}
+	// A present due-date update sets the date, or clears it (nil -> null).
+	if dd := u.NormalizedDueDate(); dd.Present {
+		fields["dueDate"] = dd.Value
 	}
 	if u.Done != nil {
 		if *u.Done {

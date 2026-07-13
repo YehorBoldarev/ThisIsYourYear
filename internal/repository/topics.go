@@ -23,6 +23,8 @@ type topicDoc struct {
 	Year           int                `bson:"year"`
 	Color          string             `bson:"color"`
 	Icon           string             `bson:"icon"`
+	Category       string             `bson:"category,omitempty"`
+	TargetDate     *time.Time         `bson:"targetDate,omitempty"`
 	ArchivedAt     *time.Time         `bson:"archivedAt,omitempty"`
 }
 
@@ -35,6 +37,8 @@ func (d *topicDoc) toDomain() *domain.Topic {
 		Year:        d.Year,
 		Color:       d.Color,
 		Icon:        d.Icon,
+		Category:    d.Category,
+		TargetDate:  d.TargetDate,
 		ArchivedAt:  d.ArchivedAt,
 		CreatedAt:   d.CreatedAt,
 		UpdatedAt:   d.UpdatedAt,
@@ -80,6 +84,8 @@ func (r *TopicRepository) Create(ctx context.Context, t *domain.Topic) error {
 		Year:        t.Year,
 		Color:       t.Color,
 		Icon:        t.Icon,
+		Category:    t.Category,
+		TargetDate:  t.TargetDate,
 		ArchivedAt:  t.ArchivedAt,
 	}
 	if err := r.repo.Insert(ctx, doc); err != nil {
@@ -199,6 +205,13 @@ func topicUpdateFields(u domain.TopicUpdate) bson.M {
 	}
 	if u.Icon != nil {
 		fields["icon"] = strings.TrimSpace(*u.Icon)
+	}
+	if u.Category != nil {
+		fields["category"] = strings.TrimSpace(*u.Category)
+	}
+	// A present target-date update sets the date, or clears it (nil -> null).
+	if td := u.NormalizedTargetDate(); td.Present {
+		fields["targetDate"] = td.Value
 	}
 	if u.Archived != nil {
 		if *u.Archived {

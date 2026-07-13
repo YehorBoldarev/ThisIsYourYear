@@ -12,9 +12,25 @@ type CreateTopicRequest struct {
 	Title       string `json:"title" validate:"required,max=120"`
 	Description string `json:"description" validate:"max=2000"`
 	// Year is optional; when 0 the domain defaults it to the current year.
-	Year  int    `json:"year" validate:"omitempty,min=2000,max=2100"`
-	Color string `json:"color" validate:"omitempty,hexcolor"`
-	Icon  string `json:"icon" validate:"max=64"`
+	Year     int    `json:"year" validate:"omitempty,min=2000,max=2100"`
+	Color    string `json:"color" validate:"omitempty,hexcolor"`
+	Icon     string `json:"icon" validate:"max=64"`
+	Category string `json:"category" validate:"omitempty,max=60"`
+	// TargetDate is an optional deadline in DD-MM-YYYY form.
+	TargetDate string `json:"targetDate" validate:"omitempty,datetime=02-01-2006"`
+}
+
+// toInput maps the validated request to the service input, parsing the date.
+func (r CreateTopicRequest) toInput() service.CreateTopicInput {
+	return service.CreateTopicInput{
+		Title:       r.Title,
+		Description: r.Description,
+		Year:        r.Year,
+		Color:       r.Color,
+		Icon:        r.Icon,
+		Category:    r.Category,
+		TargetDate:  parseDate(r.TargetDate),
+	}
 }
 
 // UpdateTopicRequest is the body of PATCH /topics/{id}. Pointer fields make the
@@ -26,6 +42,9 @@ type UpdateTopicRequest struct {
 	Color       *string `json:"color" validate:"omitempty,hexcolor"`
 	Icon        *string `json:"icon" validate:"omitempty,max=64"`
 	Archived    *bool   `json:"archived"`
+	Category    *string `json:"category" validate:"omitempty,max=60"`
+	// TargetDate: omit to leave unchanged, "" to clear, DD-MM-YYYY to set.
+	TargetDate *optionalDate `json:"targetDate,omitempty"`
 }
 
 func (r UpdateTopicRequest) toDomain() domain.TopicUpdate {
@@ -36,6 +55,8 @@ func (r UpdateTopicRequest) toDomain() domain.TopicUpdate {
 		Color:       r.Color,
 		Icon:        r.Icon,
 		Archived:    r.Archived,
+		Category:    r.Category,
+		TargetDate:  r.TargetDate.fieldUpdate(),
 	}
 }
 
@@ -54,6 +75,8 @@ type TopicResponse struct {
 	Year        int              `json:"year"`
 	Color       string           `json:"color"`
 	Icon        string           `json:"icon"`
+	Category    string           `json:"category"`
+	TargetDate  string           `json:"targetDate"`
 	Archived    bool             `json:"archived"`
 	Progress    ProgressResponse `json:"progress"`
 	Motivation  string           `json:"motivation"`
@@ -70,6 +93,8 @@ func topicResponse(v *service.TopicView) TopicResponse {
 		Year:        t.Year,
 		Color:       t.Color,
 		Icon:        t.Icon,
+		Category:    t.Category,
+		TargetDate:  formatDate(t.TargetDate),
 		Archived:    t.IsArchived(),
 		Progress: ProgressResponse{
 			Total:     v.Progress.Total,
