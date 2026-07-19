@@ -1,0 +1,95 @@
+===========================================================================
+   THIS IS YOUR YEAR  -  How to open the website on your computer
+===========================================================================
+
+Hello! This short guide gets the website running on your own Windows PC.
+You do NOT need to know anything technical. Just follow the steps in order.
+
+You need:
+  - A Windows computer.
+  - An internet connection (needed the FIRST time you start it).
+  - About 15 minutes for the very first setup (later it opens in seconds).
+
+
+---------------------------------------------------------------------------
+STEP 1 - Download the files
+---------------------------------------------------------------------------
+1. Open the link I sent you (it opens a page on github.com).
+2. Click the green button that says  "< > Code".
+3. In the little menu, click  "Download ZIP".
+4. The file saves to your Downloads folder (a .zip file).
+
+
+---------------------------------------------------------------------------
+STEP 2 - Unzip the files
+---------------------------------------------------------------------------
+1. Open your Downloads folder and find the file you just downloaded.
+2. Right-click it and choose  "Extract All..."  then click  "Extract".
+3. A normal folder opens with the files inside.
+
+
+---------------------------------------------------------------------------
+STEP 3 - Start the website
+---------------------------------------------------------------------------
+1. In that folder, find the file named:   start-website.bat
+2. Double-click it. A black window opens - that is normal. Leave it open.
+
+   * If Windows shows a blue "Windows protected your PC" box, click
+     "More info", then "Run anyway".
+   * If Windows asks for permission (a prompt asking Yes/No), click "Yes".
+
+3. THE FIRST TIME ONLY: the window may install a helper component and then
+   ask you to RESTART your computer.
+      -> Restart the computer, then double-click  start-website.bat  again.
+
+4. The first real start takes several minutes while it builds everything.
+   The black window shows progress - just wait.
+
+5. When it is ready, the website OPENS BY ITSELF in your web browser.
+   If it doesn't, open your browser and go to:   http://localhost:8080
+
+
+---------------------------------------------------------------------------
+STEP 4 - Use it
+---------------------------------------------------------------------------
+1. On the website, click "Register" (or "Create account") to make your login.
+2. Sign in and start adding your goals for the year. Enjoy!
+
+Note: the website only works while your computer is on and you have started
+it. It is private to this computer - no one else can see it.
+
+
+---------------------------------------------------------------------------
+STOPPING AND STARTING AGAIN
+---------------------------------------------------------------------------
+- To STOP the website:   double-click  stop-website.bat
+      Your account and everything you added are kept safe.
+
+- To START it again later:   double-click  start-website.bat
+      (After the first time, this only takes a few seconds.)
+
+
+---------------------------------------------------------------------------
+REMOVING THE WEBSITE COMPLETELY
+---------------------------------------------------------------------------
+If you ever want to remove it and all its data from your computer:
+
+  1. Double-click  uninstall-website.bat
+  2. Type  YES  and press Enter when it asks.
+
+This deletes the website and everything you created in it (this cannot be
+undone). Afterwards you can also delete the whole folder.
+
+
+---------------------------------------------------------------------------
+IF SOMETHING DOESN'T WORK
+---------------------------------------------------------------------------
+- Make sure you are connected to the internet, then try
+  start-website.bat  again.
+- If the black window closed too fast to read, double-click
+  start-website.bat once more and watch for any message.
+- If the helper component won't start, open "Docker Desktop" from the Start
+  menu, wait until it says it is running, then run start-website.bat again.
+- Still stuck? Send me a photo of the black window and I'll help.
+
+===========================================================================

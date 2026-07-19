@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/*
+ * Map the design tokens onto Tailwind's theme so utilities like `bg-surface`,
+ * `text-muted`, `border-subtle`, `rounded-card`, `shadow-card`, `text-teal`
+ * exist. `@theme inline` emits `var(--token)` references (not resolved values),
+ * so every utility follows the active `data-theme` at runtime.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-bar: var(--bar);
+  --color-elevated: var(--surface-elevated);
+  --color-input: var(--input-bg);
+  --color-fill-muted: var(--fill-muted);
+  --color-fill-raised: var(--fill-raised);
+
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-popup: var(--border-popup);
+  --color-border-input: var(--border-input);
+
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-text-label: var(--text-label);
+
+  --color-teal: var(--accent-teal);
+  --color-teal-hover: var(--accent-teal-hover);
+  --color-blue: var(--accent-blue);
+  --color-gold: var(--accent-gold);
+  --color-gold-hover: var(--accent-gold-hover);
+  --color-gold-deep: var(--accent-gold-deep);
+  --color-rose: var(--accent-rose);
+  --color-track: var(--track);
+  --color-btn-ink: var(--btn-ink);
+
+  --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
+  --font-mono: 'Spline Sans Mono Variable', ui-monospace, monospace;
+
+  --radius-card: 18px;
+  --radius-field: 12px;
+  --radius-chip: 14px;
+
+  --shadow-card: var(--elev-card);
+  --shadow-popup: var(--elev-popup);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    background-image: radial-gradient(
+      circle at 50% -10%,
+      var(--bg-radial-from),
+      var(--bg-radial-to)
+    );
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* A visible, on-brand focus ring for keyboard users across primitives. */
+  :focus-visible {
+    outline: 2px solid var(--accent-teal);
+    outline-offset: 2px;
+  }
+}
+
+/* Mono label helper: uppercase, letter-spaced (handoff spec .08–.2em). */
+@utility label-mono {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* Celebration confetti fall (screen 7). Motion is gated by the component under
+ * prefers-reduced-motion; this also disables it defensively at the CSS layer. */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-12px) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(340px) rotate(240deg);
+    opacity: 0;
+  }
+}
+
+@utility animate-confetti {
+  animation: confetti-fall 2.4s ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-confetti {
+    animation: none;
+  }
+
+  /* App-wide guard: neutralize animations/transitions (skeleton pulses, hover
+   * fades, etc.) for users who ask for reduced motion. Confetti is also gated
+   * in JS (src/components/Confetti.tsx) so it renders nothing at all. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -20,6 +20,7 @@ import (
 	"kibou/thisisyouryear/internal/repository"
 	"kibou/thisisyouryear/internal/service"
 	transporthttp "kibou/thisisyouryear/internal/transport/http"
+	"kibou/thisisyouryear/internal/transport/http/webui"
 )
 
 func main() {
@@ -103,7 +104,13 @@ func run() error {
 			AuthRequests: cfg.RateLimitAuthRequests,
 			AuthWindow:   cfg.RateLimitAuthWindow,
 		},
+		// Present only in the `-tags embedui` build; nil otherwise (API-only).
+		SPAFS: webui.FS(),
 	})
+
+	if webui.Enabled {
+		logger.Info("serving embedded single-page app on unmatched routes")
+	}
 
 	server := transporthttp.NewServer(transporthttp.ServerConfig{
 		Port:            cfg.HTTPPort,

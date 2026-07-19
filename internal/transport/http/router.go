@@ -1,6 +1,7 @@
 package http
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"time"
@@ -35,6 +36,11 @@ type RouterDeps struct {
 	// RateLimit configures per-IP throttling of the public auth endpoints. When
 	// RateLimit.AuthRequests is 0, no auth rate limiting is installed.
 	RateLimit RateLimitConfig
+
+	// SPAFS, when non-nil, is the built single-page app served for any route the
+	// API/ops groups don't match (with a client-side-routing fallback to
+	// index.html). Nil ⇒ API-only: unmatched routes get the default 404.
+	SPAFS fs.FS
 }
 
 // RateLimitConfig describes the per-IP fixed-window limit applied to the public
@@ -123,6 +129,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 			protected.Get("/dashboard", dashboardHandler.Get)
 		})
 	})
+
+	// When a SPA is provided, serve it for every unmatched route (static file or
+	// index.html fallback). This runs after all API/ops routes, so it never
+	// shadows them; unmatched /api/** paths still return the JSON 404 envelope.
+	if deps.SPAFS != nil {
+		r.NotFound(newSPAHandler(deps.SPAFS, deps.Logger))
+	}
 
 	return r
 }

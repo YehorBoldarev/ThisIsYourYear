@@ -3,6 +3,12 @@
 *.exe
 *.out
 
+# Frontend build output embedded into the binary (`make web-build`); the .gitkeep
+# placeholder is tracked so `go:embed all:dist` compiles from a clean checkout.
+/internal/transport/http/webui/dist/*
+!/internal/transport/http/webui/dist/.gitkeep
+/web/dist/
+
 # Local environment
 .env
 

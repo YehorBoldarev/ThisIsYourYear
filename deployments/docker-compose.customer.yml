@@ -1,0 +1,50 @@
+# Customer launch stack — the whole website (web app + API + database) started
+# with one command. This file is driven by the .bat scripts in the project root
+# (start-website.bat / stop-website.bat / uninstall-website.bat).
+#
+# Everything runs locally on this machine. Nothing is exposed to the internet;
+# the site is reachable only at http://localhost:8080 on this computer.
+name: thisisyouryear
+
+services:
+  # MongoDB — the database. Only the api service talks to it (over the private
+  # compose network), so it is not published to the host.
+  mongo:
+    image: mongo:7
+    container_name: tiyy-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # The website itself: the Go server that serves the single-page app AND the
+  # API from one origin. Built from the project's Dockerfile.
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: tiyy-api
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      HTTP_PORT: "8080"
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DATABASE: thisisyouryear
+      LOG_LEVEL: info
+      # The site is served over plain http://localhost, so the sign-in cookie
+      # must NOT be marked "Secure" (that would restrict it to https and break
+      # staying signed in). This is a local-demo setting only.
+      COOKIE_SECURE: "false"
+    ports:
+      - "8080:8080"
+
+volumes:
+  mongo-data:

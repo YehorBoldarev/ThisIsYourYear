@@ -15,8 +15,20 @@ run: ## Run the API locally (expects Mongo reachable, e.g. via `make compose-up`
 	go run ./cmd/api
 
 .PHONY: build
-build: ## Compile the API binary into ./bin.
+build: ## Compile the API binary into ./bin (backend only, no embedded SPA).
 	go build -o bin/api ./cmd/api
+
+WEBUI_DIST := internal/transport/http/webui/dist
+
+.PHONY: web-build
+web-build: ## Build the frontend and stage it under the Go embed directory.
+	cd web && npm ci && npm run build
+	find $(WEBUI_DIST) -mindepth 1 ! -name .gitkeep -delete
+	cp -r web/dist/. $(WEBUI_DIST)/
+
+.PHONY: build-all
+build-all: web-build ## Build the self-contained binary with the SPA embedded (-tags embedui).
+	go build -tags embedui -o bin/api ./cmd/api
 
 .PHONY: test
 test: ## Run unit tests with the race detector.
