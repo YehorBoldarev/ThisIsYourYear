@@ -22,7 +22,7 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
           <h1 className="mt-4 font-serif text-3xl font-medium text-text">{title}</h1>
           {subtitle && <p className="mt-2 text-sm text-text-2">{subtitle}</p>}
         </div>
-        <div className="rounded-card border border-border bg-surface p-7 shadow-card">
+        <div className="rounded-card border border-border bg-elevated p-7 shadow-card">
           {children}
         </div>
         {footer && <p className="mt-6 text-center text-sm text-text-muted">{footer}</p>}

@@ -575,6 +575,29 @@ components:
           maximum: 1
           description: completed / total, or 0 when there are no goals.
 
+    Motivation:
+      type: object
+      description: |
+        Encouraging copy for the band a topic's live progress falls in. Bands:
+        `not-started` (no goals, or none done), `in-progress` (below 80%),
+        `almost-there` (80% up to, not including, 100%), `achieved` (100%).
+      required: [band, label, title, message]
+      properties:
+        band:
+          type: string
+          enum: [not-started, in-progress, almost-there, achieved]
+          description: Stable band identifier; clients key presentation (e.g. colour) off it.
+        label:
+          type: string
+          example: Almost there
+          description: Short state label.
+        title:
+          type: string
+          example: In sight
+        message:
+          type: string
+          description: The encouraging message itself.
+
     CreateTopicRequest:
       type: object
       required: [title]
@@ -664,8 +687,7 @@ components:
         progress:
           $ref: "#/components/schemas/Progress"
         motivation:
-          type: string
-          description: Encouraging message derived from the topic's live progress.
+          $ref: "#/components/schemas/Motivation"
         createdAt:
           type: string
           format: date-time
@@ -786,7 +808,7 @@ components:
           description: The year this dashboard summarizes.
         message:
           type: string
-          description: A positive message; a distinct empty-state line when there are no topics.
+          description: The overall progress band's motivation message; a distinct empty-state line when there are no topics.
         progress:
           $ref: "#/components/schemas/Progress"
         topics:

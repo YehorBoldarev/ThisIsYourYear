@@ -67,21 +67,39 @@ type ProgressResponse struct {
 	Ratio     float64 `json:"ratio"`
 }
 
+// MotivationResponse is the encouraging copy for a topic's current progress
+// band. Band is a stable identifier clients key presentation off.
+type MotivationResponse struct {
+	Band    string `json:"band"`
+	Label   string `json:"label"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+}
+
+func motivationResponse(m domain.Motivation) MotivationResponse {
+	return MotivationResponse{
+		Band:    string(m.Band),
+		Label:   m.Label,
+		Title:   m.Title,
+		Message: m.Message,
+	}
+}
+
 // TopicResponse is the public projection of a topic.
 type TopicResponse struct {
-	ID          string           `json:"id"`
-	Title       string           `json:"title"`
-	Description string           `json:"description"`
-	Year        int              `json:"year"`
-	Color       string           `json:"color"`
-	Icon        string           `json:"icon"`
-	Category    string           `json:"category"`
-	TargetDate  string           `json:"targetDate"`
-	Archived    bool             `json:"archived"`
-	Progress    ProgressResponse `json:"progress"`
-	Motivation  string           `json:"motivation"`
-	CreatedAt   time.Time        `json:"createdAt"`
-	UpdatedAt   time.Time        `json:"updatedAt"`
+	ID          string             `json:"id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Year        int                `json:"year"`
+	Color       string             `json:"color"`
+	Icon        string             `json:"icon"`
+	Category    string             `json:"category"`
+	TargetDate  string             `json:"targetDate"`
+	Archived    bool               `json:"archived"`
+	Progress    ProgressResponse   `json:"progress"`
+	Motivation  MotivationResponse `json:"motivation"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
 }
 
 func topicResponse(v *service.TopicView) TopicResponse {
@@ -101,7 +119,7 @@ func topicResponse(v *service.TopicView) TopicResponse {
 			Completed: v.Progress.Completed,
 			Ratio:     v.Progress.Ratio,
 		},
-		Motivation: v.Motivation,
+		Motivation: motivationResponse(v.Motivation),
 		CreatedAt:  t.CreatedAt,
 		UpdatedAt:  t.UpdatedAt,
 	}

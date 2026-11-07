@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { isApiError } from '../../api/errors'
 import { useTopics, type Topic } from './useTopics'
 import type { Goal } from './useTopicGoals'
@@ -30,7 +29,6 @@ type State =
 export function ModalHost({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ kind: 'none' })
   const [deleteError, setDeleteError] = useState('')
-  const navigate = useNavigate()
   const topicsQuery = useTopics()
   const deleteTopic = useDeleteTopic()
   const deleteGoal = useDeleteGoal()
@@ -80,10 +78,6 @@ export function ModalHost({ children }: { children: ReactNode }) {
         <CelebrationModal
           topic={liveTopic}
           allTopics={topicsQuery.data ?? []}
-          onReflect={() => {
-            close()
-            navigate('/reflections')
-          }}
           onClose={() => backToDetail(liveTopic.id)}
         />
       )}

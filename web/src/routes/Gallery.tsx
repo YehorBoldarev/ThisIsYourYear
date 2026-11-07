@@ -35,7 +35,7 @@ const ICONS: IconName[] = [
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-7 shadow-card">
+    <section className="rounded-card border border-border bg-elevated p-7 shadow-card">
       <h2 className="label-mono mb-5 text-[11px] text-text-muted">{title}</h2>
       <div className="flex flex-wrap items-center gap-4">{children}</div>
     </section>
@@ -119,7 +119,7 @@ export function Gallery() {
         {ICONS.map((name) => (
           <span key={name} className="flex flex-col items-center gap-1 text-text-2">
             <Icon name={name} title={name} />
-            <span className="label-mono text-[9px] text-text-faint">{name}</span>
+            <span className="label-mono text-[9px] text-text-muted">{name}</span>
           </span>
         ))}
       </Section>

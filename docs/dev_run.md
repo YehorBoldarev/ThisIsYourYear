@@ -149,9 +149,11 @@ is **year-scoped**, defaulting to the current year (`?year=YYYY` for others). A 
 `progress` (`{total, completed, ratio}`) is computed from its goals; completing a goal
 (`{"done":true}`) marks it an achievement and raises the ratio.
 
-Each topic response also carries a `motivation` string — an encouraging message derived from
-its live progress (no goals → "set your first goal…", partway → momentum copy, 100% → a
-celebratory 🎉). It is computed, never stored, so it always matches the current ratio.
+Each topic response also carries a `motivation` object — `{band, label, title, message}` —
+derived from its live progress using the design's four bands: `not-started` (no goals, or none
+done), `in-progress` (below 80%), `almost-there` (80% up to 100%), `achieved` (100%). It is
+computed, never stored, so it always matches the current ratio. The copy lives in one table in
+`internal/domain/motivation.go`; the SPA renders it as-is and only maps `band` to a colour.
 
 Topics and goals also carry optional **design fields** (added for the frontend): a topic has a
 `category` and a `targetDate`; a goal (milestone) has a `dueDate` and an `isAchievement` flag (the
@@ -162,7 +164,7 @@ empty string** `""`, or set with a `DD-MM-YYYY` value; an invalid format returns
 `GET /dashboard` is the landing summary for the caller's **current-year, non-archived** topics:
 aggregate `progress` (`{total, completed, ratio}` summed across all goals), a `topics`
 tally (`{total, completed}`), a positive `message` (a motivational empty-state line when there
-are no topics yet, otherwise the progress-derived band), and a `countdown` to the next New Year
+are no topics yet, otherwise the overall progress band's `message`), and a `countdown` to the next New Year
 (`target` in UTC + `secondsRemaining`; the SPA localizes the target to the browser timezone).
 
 `GET /openapi.yaml` serves the checked-in **OpenAPI 3.1** contract (`api/openapi.yaml`, embedded
@@ -291,9 +293,9 @@ immediately) and reconcile from the server on settle. Completing the **last** mi
 of a chapter fires the **100% celebration** (medallion, confetti — skipped under
 `prefers-reduced-motion` — a congratulatory quote, and a milestones/duration/rank stat
 strip). The **Wins** tab (`/achievements`) derives its list client-side from completed,
-starred milestones across the year's chapters. One **four-band motivation system**
-(`lib/motivation`, the design's copy) feeds both the dashboard rows and the topic-detail
-callout — there is no achievements endpoint; the Wins page fans out `GET /topics/{id}/goals`.
+starred milestones across the year's chapters. The **four-band motivation copy** comes from
+the API (`topic.motivation`, plus the dashboard `message`); `lib/motivation` only maps each band
+to its tone colour, so the greeting, chapter rows and topic-detail callout speak in one voice — there is no achievements endpoint; the Wins page fans out `GET /topics/{id}/goals`.
 B6 hardened accessibility: a **skip-to-content** link, `aria-current` on the active nav,
 `role="alert"` on form/confirm errors, a global **`prefers-reduced-motion`** guard (on top
 of the JS Confetti gate), and an automated **axe** gate over the key screens.
@@ -319,9 +321,10 @@ dashboard, Wins, an open modal) plus cross-theme AppShell render tests.
   fades are neutralized and the celebration shows **no** confetti.
 - **States:** each of dashboard / Wins / topic-detail shows loading, error (with retry),
   and empty; form and confirm errors are announced (`role="alert"`).
-- **Contrast (open item):** measured token contrast passes AA in **dark**; the **light**
-  palette's secondary/label/accent-on-paper values fall below AA and need a palette
-  decision (see the B6 changelog note) — token *values* aren't changed without sign-off.
+- **Contrast:** enforced by `src/styles/contrast.test.ts` (WCAG AA for every text token on
+  every surface, both themes). In the browser, spot-check that accent-coloured **text** uses
+  the `-ink` utilities (`text-teal-ink`, `text-gold-ink`, `text-blue-ink`) — the plain accent
+  utilities are for fills/strokes/borders only — and that `text-faint` isn't used for text.
 
 ---
 
@@ -378,6 +381,46 @@ This path is a **local single-machine demo**, distinct from the production guida
 ---
 
 ## Changelog
+
+- **Fix — Big-goal completion no longer claims to be an achievement:** in this app a ★
+  achievement (a Wins entry) is a milestone the user starred, but finishing a whole big goal
+  showed "Achievement unlocked", a "★ Achieved" chapter tag and an "Achieved" status label —
+  none of which add anything to Wins. The celebration eyebrow now reads **"Big goal complete"**,
+  the 100% chapter tag is **"✓ Complete"** (check, not star), and the server's 100% band label is
+  **"Complete"** (band id `achieved` unchanged, so no API change). The celebration's **"Reflect on
+  it"** button was removed because it led to the "coming soon" Reflections placeholder; restore it
+  with the Reflections feature. Milestone-level "Achieved" tags (real ★ wins) are unchanged.
+  Verified: web typecheck/ESLint/Prettier/Vitest (176) green; `go test ./...` green.
+
+- **Fix — Page background, light-theme contrast (WCAG AA) & unified motivation copy:**
+  *Page background.* Pages were painted with the handoff's cream radial gradient, which in the
+  design is only the backdrop behind popups; the design's page frames sit on paper (`#faf6ee`,
+  dark `#131210`) under white (dark `#16140f`) header/footer bars. The body now uses `--surface`
+  (the unused `--bg`/`--bg-radial-*` tokens were removed), and cards that sit on the page (auth
+  card, Wins cards, mobile chapter cards, gallery sections) moved to `bg-elevated` so they still
+  lift off it.
+  *Contrast.* A measured audit showed AA failures in **both** themes (the B6 note had dark as
+  passing): in light, `text-muted`/`text-faint` ≈2.5–3.1:1, gold-as-text ≈2.3:1, teal ≈3.1:1,
+  every error message (rose) ≈3.2:1, and white button text on teal/gold/rose; in dark,
+  `text-faint` ≈2.2:1. Fix keeps the designed fills (rings, bars, swatches,
+  medallion) and fixes text: new `--accent-{teal,blue,gold}-ink` tokens for accent-coloured text
+  and glyphs (deeper in light, equal to the accent in dark); light `text-2`/`text-muted` and
+  `--accent-rose` darkened; light buttons use dark ink; the danger button and avatar got their
+  own ink tokens; `text-faint` is now decorative-only (its 8 text uses moved to `text-muted`);
+  unused `text-label` removed. The done-milestone ✓ (white on the stored topic accent, ≈2:1 in
+  both themes) now uses the button ink. New `src/styles/contrast.test.ts` asserts every pair
+  from `tokens.css`, so palette edits can't regress silently.
+  *Motivation.* The dashboard greeting showed the backend's six-band copy while chapter rows and
+  the topic callout showed the frontend's four-band copy (different thresholds and voice), and
+  `topic.motivation` was computed but never displayed. The backend is now the single source:
+  `domain/motivation.go` implements the design's four bands (80% "almost there" threshold) and
+  copy; `motivation` on topics changed from a string to `{band, label, title, message}`
+  (`api/openapi.yaml` + regenerated `schema.d.ts`); the dashboard `message` uses the same table.
+  The SPA renders the server copy and `lib/motivation.ts` only maps band → tone. During an
+  optimistic milestone toggle the ring/percent move instantly; the copy follows on the settle
+  refetch. Verified: `gofmt`, `go vet` (both tags), `make test` (race) and `make test-int`
+  green; web typecheck, ESLint, Prettier, Vitest (208 tests, incl. the new contrast gate, which
+  was confirmed to fail on the old values), `gen:api`, and build green.
 
 - **Customer one-click launcher (local demo):** added root-level `START-HERE.txt` +
   `start/stop/uninstall-website.bat` and `deployments/docker-compose.customer.yml` so a

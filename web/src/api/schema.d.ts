@@ -341,6 +341,27 @@ export interface components {
              */
             ratio: number;
         };
+        /**
+         * @description Encouraging copy for the band a topic's live progress falls in. Bands:
+         *     `not-started` (no goals, or none done), `in-progress` (below 80%),
+         *     `almost-there` (80% up to, not including, 100%), `achieved` (100%).
+         */
+        Motivation: {
+            /**
+             * @description Stable band identifier; clients key presentation (e.g. colour) off it.
+             * @enum {string}
+             */
+            band: "not-started" | "in-progress" | "almost-there" | "achieved";
+            /**
+             * @description Short state label.
+             * @example Almost there
+             */
+            label: string;
+            /** @example In sight */
+            title: string;
+            /** @description The encouraging message itself. */
+            message: string;
+        };
         CreateTopicRequest: {
             title: string;
             description?: string;
@@ -385,8 +406,7 @@ export interface components {
             targetDate: string;
             archived: boolean;
             progress: components["schemas"]["Progress"];
-            /** @description Encouraging message derived from the topic's live progress. */
-            motivation: string;
+            motivation: components["schemas"]["Motivation"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -464,7 +484,7 @@ export interface components {
         Dashboard: {
             /** @description The year this dashboard summarizes. */
             year: number;
-            /** @description A positive message; a distinct empty-state line when there are no topics. */
+            /** @description The overall progress band's motivation message; a distinct empty-state line when there are no topics. */
             message: string;
             progress: components["schemas"]["Progress"];
             topics: components["schemas"]["TopicTally"];

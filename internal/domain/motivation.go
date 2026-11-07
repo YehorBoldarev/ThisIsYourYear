@@ -2,59 +2,85 @@ package domain
 
 // MotivationBand is a coarse stage of a topic's completion, used to pick an
 // encouraging message. Bands partition every possible Progress into exactly one
-// stage (see MotivationBandOf for the exact, non-overlapping boundaries).
-type MotivationBand int
+// stage (see MotivationBandOf for the exact, non-overlapping boundaries). The
+// values are stable wire identifiers: clients key presentation (e.g. colour) off
+// them, so they must not change.
+type MotivationBand string
 
+// The four bands from the design's motivational-message state reference
+// (design_handoff_this_is_your_year/README.md, screen 7).
 const (
-	// BandNoGoals: the topic has no goals yet (total == 0).
-	BandNoGoals MotivationBand = iota
-	// BandStarted: goals exist but none are done (ratio == 0, total > 0).
-	BandStarted
-	// BandQuarter: up to a quarter done (0 < ratio <= 0.25).
-	BandQuarter
-	// BandHalf: up to half done (0.25 < ratio <= 0.5).
-	BandHalf
-	// BandMost: past half but not finished (0.5 < ratio < 1.0).
-	BandMost
-	// BandComplete: every goal done (ratio == 1.0).
-	BandComplete
+	// BandNotStarted: no goals yet, or none done (ratio == 0).
+	BandNotStarted MotivationBand = "not-started"
+	// BandInProgress: some goals done, below the almost-there threshold.
+	BandInProgress MotivationBand = "in-progress"
+	// BandAlmostThere: at or past the threshold but not finished.
+	BandAlmostThere MotivationBand = "almost-there"
+	// BandAchieved: every goal done (ratio == 1.0).
+	BandAchieved MotivationBand = "achieved"
 )
 
-// motivationMessages holds the single message shipped for each band. The copy
-// lives in this one table so wording is a one-file change; the "encouraging &
-// warm" voice is a product decision (see plans/06-motivation-engine.md §7).
-var motivationMessages = map[MotivationBand]string{
-	BandNoGoals:  "Set your first goal — every big year starts with one step.",
-	BandStarted:  "The hardest part is starting, and you're already here. Let's go.",
-	BandQuarter:  "You're on the board. Keep the momentum going.",
-	BandHalf:     "Real progress — you're building something. Keep at it.",
-	BandMost:     "More than halfway. The finish line is in sight.",
-	BandComplete: "Every goal complete — this one's in the books. 🎉",
+// almostThereThreshold is the ratio at which a topic counts as "almost there"
+// (the ~80% the design mock uses).
+const almostThereThreshold = 0.8
+
+// Motivation is the encouraging copy for one band: a short state label (e.g.
+// "Almost there"), a title (e.g. "In sight"), and the message itself.
+type Motivation struct {
+	Band    MotivationBand
+	Label   string
+	Title   string
+	Message string
 }
 
-// MotivationBandOf classifies a Progress into exactly one band. Boundaries are
-// upper-closed (e.g. exactly 0.25 is BandQuarter, exactly 0.5 is BandHalf), so
+// motivations holds the copy shipped for each band. It lives in this one table
+// so wording is a one-file change; the text is the design's canonical copy.
+var motivations = map[MotivationBand]Motivation{
+	BandNotStarted: {
+		Band:    BandNotStarted,
+		Label:   "Just started",
+		Title:   "The blank page",
+		Message: "A blank page isn’t empty — it’s full of everything that could be. Make the first mark today.",
+	},
+	BandInProgress: {
+		Band:    BandInProgress,
+		Label:   "In progress",
+		Title:   "Building momentum",
+		Message: "Momentum is quiet. Keep showing up, and the small days compound into a remarkable year.",
+	},
+	BandAlmostThere: {
+		Band:    BandAlmostThere,
+		Label:   "Almost there",
+		Title:   "In sight",
+		Message: "You can see it from here. Don’t trade the finish line for comfort — finish what you started.",
+	},
+	BandAchieved: {
+		Band:    BandAchieved,
+		Label:   "Complete",
+		Title:   "A promise kept",
+		Message: "You kept a promise to yourself. This is exactly what that feels like. Take a moment to savour it.",
+	},
+}
+
+// MotivationBandOf classifies a Progress into exactly one band. The
+// almost-there boundary is lower-closed (exactly 0.8 is BandAlmostThere), so
 // every ratio in [0,1] maps to one band with no gaps or overlaps.
 func MotivationBandOf(p Progress) MotivationBand {
 	switch {
-	case p.Total == 0:
-		return BandNoGoals
-	case p.Ratio == 0:
-		return BandStarted
+	case p.Total == 0 || p.Ratio <= 0:
+		return BandNotStarted
 	case p.Ratio >= 1.0:
-		return BandComplete
-	case p.Ratio <= 0.25:
-		return BandQuarter
-	case p.Ratio <= 0.5:
-		return BandHalf
+		return BandAchieved
+	case p.Ratio >= almostThereThreshold:
+		return BandAlmostThere
 	default:
-		return BandMost
+		return BandInProgress
 	}
 }
 
-// Motivate returns the encouraging message for a topic's current progress. It is
+// Motivate returns the encouraging copy for a topic's current progress. It is
 // a pure function of Progress — deterministic and free of side effects — so the
 // dashboard can reuse it unchanged.
-func Motivate(p Progress) string {
-	return motivationMessages[MotivationBandOf(p)]
+func Motivate(p Progress) Motivation {
+	return motivations[MotivationBandOf(p)]
 }

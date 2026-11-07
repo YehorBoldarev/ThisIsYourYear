@@ -2,7 +2,7 @@ import type { InputHTMLAttributes } from 'react'
 import { cn } from '../lib/cn'
 
 const field =
-  'w-full rounded-field border bg-input px-3.5 py-3 text-sm text-text placeholder:text-text-faint ' +
+  'w-full rounded-field border bg-input px-3.5 py-3 text-sm text-text placeholder:text-text-muted ' +
   'transition-colors focus:outline-none focus-visible:border-teal'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {

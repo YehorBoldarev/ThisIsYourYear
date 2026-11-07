@@ -30,7 +30,7 @@ type TopicGoals interface {
 type TopicView struct {
 	Topic      *domain.Topic
 	Progress   domain.Progress
-	Motivation string
+	Motivation domain.Motivation
 }
 
 // newTopicView pairs a topic with its progress and the motivational message for

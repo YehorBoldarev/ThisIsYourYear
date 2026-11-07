@@ -54,6 +54,27 @@ describe('TopicDetailModal', () => {
     expect(screen.getByText(/1 of 2 milestones complete/)).toBeInTheDocument()
   })
 
+  it('renders the server-computed motivation copy in its band tone', () => {
+    renderModal(
+      <TopicDetailModal
+        topic={topicResponse({
+          progress: { total: 10, completed: 9, ratio: 0.9 },
+          motivation: {
+            band: 'almost-there',
+            label: 'Almost there',
+            title: 'In sight',
+            message: 'You can see it from here.',
+          },
+        })}
+        {...baseProps()}
+      />,
+    )
+
+    expect(screen.getByText('In sight')).toHaveClass('text-teal-ink')
+    expect(screen.getByText('You can see it from here.')).toBeInTheDocument()
+    expect(screen.getByText('Almost there · 1 milestone to go')).toBeInTheDocument()
+  })
+
   it('optimistically completes a milestone when its circle is clicked', async () => {
     const goals: Goal[] = [goalResponse({ id: 'g1', title: 'Register for the race' })]
     server.use(

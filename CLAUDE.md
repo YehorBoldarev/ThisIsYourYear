@@ -103,17 +103,22 @@ React 19 + Vite + TypeScript (strict) + Tailwind CSS v4 + TanStack Query + react
   settle-invalidate). Feature folders under `src/features/` (dashboard, topics, celebration,
   achievements). There is **no achievements endpoint** — wins are derived client-side by fanning
   `GET /topics/{id}/goals` and filtering `done && isAchievement`.
-- **Motivation exists twice, and they differ.** The backend (`internal/domain/motivation.go`,
-  six bands) computes the `motivation` string returned on every topic. The UI does **not** render
-  that string: it derives its own copy from the progress ratio via `src/lib/motivation.ts` (four
-  design bands), the single UI source used by dashboard rows and the topic-detail callout. To
-  change what users see, edit the frontend file.
+- **Motivation copy is server-owned.** `internal/domain/motivation.go` holds the design's four
+  bands (80% "almost there" threshold) and all copy; topics carry `motivation: {band, label,
+  title, message}` and the dashboard `message` uses the same table. The SPA renders it as-is —
+  `src/lib/motivation.ts` only maps `band` → tone colour. To change wording, edit the Go table.
+- **Contrast is test-enforced.** `src/styles/contrast.test.ts` checks every text token against
+  every surface in `tokens.css` (WCAG AA, both themes; in light the binding surface is the
+  `fill-muted` pill fill). Accent-coloured **text/glyphs** use the `-ink` utilities (`text-teal-ink`,
+  `text-gold-ink`, `text-blue-ink`); plain accent utilities are for fills/strokes/borders only.
+  `text-faint` is decorative-only.
 - **Tests** use MSW: `src/test/msw.ts` holds the shared server, fixtures (`TEST_USER`,
   `tokenResponse`, `dashboardResponse`, …) and the `errorBody` envelope helper. Override handlers
   per test with `server.use(...)`. `src/test/a11y.test.tsx` runs axe checks via `vitest-axe`.
 - **Design reference:** `design_handoff_this_is_your_year/` holds the HTML mockups (dark + light
   themes, desktop/tablet/mobile). Recreate them in React; ignore their templating runtime
-  (`support.js`).
+  (`support.js`). Pages sit on `--surface` (paper); the handoff's cream radial "canvas" gradient
+  is only the backdrop behind popup frames, not a page background.
 
 ## Production serving (single origin)
 

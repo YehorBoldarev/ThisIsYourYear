@@ -211,7 +211,7 @@ func TestGoalFlow_MotivationTracksProgress(t *testing.T) {
 
 	// No goals yet -> the no-goals message.
 	require.Equal(t,
-		domain.Motivate(domain.ComputeProgress(0, 0)),
+		motivationResponse(domain.Motivate(domain.ComputeProgress(0, 0))),
 		getTopic(t, app, token, topicID).Motivation,
 		"no goals => no-goals message")
 
@@ -226,7 +226,7 @@ func TestGoalFlow_MotivationTracksProgress(t *testing.T) {
 		ids = append(ids, g.ID)
 	}
 	require.Equal(t,
-		domain.Motivate(domain.ComputeProgress(2, 0)),
+		motivationResponse(domain.Motivate(domain.ComputeProgress(2, 0))),
 		getTopic(t, app, token, topicID).Motivation,
 		"goals but none done => started message")
 
@@ -240,7 +240,7 @@ func TestGoalFlow_MotivationTracksProgress(t *testing.T) {
 	final := getTopic(t, app, token, topicID)
 	require.InDelta(t, 1.0, final.Progress.Ratio, 1e-9)
 	require.Equal(t,
-		domain.Motivate(domain.ComputeProgress(2, 2)),
+		motivationResponse(domain.Motivate(domain.ComputeProgress(2, 2))),
 		final.Motivation,
 		"all goals done => complete message")
 }

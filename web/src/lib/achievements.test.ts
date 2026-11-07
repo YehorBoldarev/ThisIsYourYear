@@ -15,7 +15,7 @@ function topic(over: Partial<Topic> = {}): Topic {
     targetDate: '',
     archived: false,
     progress: { total: 2, completed: 2, ratio: 1 },
-    motivation: '',
+    motivation: { band: 'achieved', label: 'Complete', title: 'A promise kept', message: '' },
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-06-01T00:00:00Z',
     ...over,

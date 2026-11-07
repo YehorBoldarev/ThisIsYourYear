@@ -47,7 +47,12 @@ export function topicResponse(overrides: Partial<Topic> = {}): Topic {
     targetDate: '',
     archived: false,
     progress: { total: 8, completed: 6, ratio: 0.75 },
-    motivation: 'You can see it from here.',
+    motivation: {
+      band: 'in-progress',
+      label: 'In progress',
+      title: 'Building momentum',
+      message: 'Momentum is quiet. Keep showing up.',
+    },
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,

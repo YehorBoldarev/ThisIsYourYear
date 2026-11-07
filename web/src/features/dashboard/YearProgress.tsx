@@ -16,7 +16,7 @@ export function YearProgress({ secondsRemaining }: { secondsRemaining: number })
       <ProgressBar value={fraction} height={8} gradient label="Year progress" />
       <div className="label-mono mt-2 flex items-center justify-between text-[11px] text-text-muted">
         <span>Jan</span>
-        <span className="text-gold">
+        <span className="text-gold-ink">
           You are here · {percent}% · {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
         </span>
         <span>Dec</span>

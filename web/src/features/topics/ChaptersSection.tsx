@@ -12,7 +12,7 @@ export function ChaptersSection({ topics }: { topics: Topic[] }) {
         <button
           type="button"
           onClick={openCreate}
-          className="label-mono flex items-center gap-1 text-[11px] text-teal transition-colors hover:text-teal-hover cursor-pointer"
+          className="label-mono flex items-center gap-1 text-[11px] text-teal-ink transition-colors hover:text-teal-ink-hover cursor-pointer"
         >
           <Icon name="plus" size={12} />
           Begin a new chapter

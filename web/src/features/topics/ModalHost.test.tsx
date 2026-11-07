@@ -56,7 +56,7 @@ describe('ModalHost celebration trigger', () => {
     const circle = await screen.findByRole('button', { name: 'Complete Only step' })
     await userEvent.click(circle)
 
-    expect(await screen.findByText(/Achievement unlocked/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Big goal complete/i)).toBeInTheDocument()
   })
 
   it('does not celebrate when milestones remain', async () => {
@@ -84,7 +84,7 @@ describe('ModalHost celebration trigger', () => {
 
     // onCelebrate fires synchronously in the toggle handler, so a missing
     // celebration right after the click means it was correctly not triggered.
-    expect(screen.queryByText(/Achievement unlocked/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Big goal complete/i)).not.toBeInTheDocument()
     // The detail popup stays open (its title is still on screen).
     expect(screen.getByRole('heading', { name: 'Run a Half-Marathon' })).toBeInTheDocument()
   })

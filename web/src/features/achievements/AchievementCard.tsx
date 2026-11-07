@@ -9,9 +9,9 @@ export function AchievementCard({ goal, topic }: Achievement) {
   const date = formatIsoDate(goal.completedAt)
 
   return (
-    <li className="flex items-center gap-4 rounded-field border border-border-subtle bg-surface p-4">
+    <li className="flex items-center gap-4 rounded-field border border-border-subtle bg-elevated p-4">
       <span
-        className="grid size-9 shrink-0 place-items-center rounded-full text-gold"
+        className="grid size-9 shrink-0 place-items-center rounded-full text-gold-ink"
         style={{ background: 'rgba(232,183,101,0.14)' }}
         aria-hidden="true"
       >
@@ -24,7 +24,7 @@ export function AchievementCard({ goal, topic }: Achievement) {
           <span className="truncate">{topic.title}</span>
         </div>
       </div>
-      {date && <span className="label-mono shrink-0 text-[10px] text-text-faint">{date}</span>}
+      {date && <span className="label-mono shrink-0 text-[10px] text-text-muted">{date}</span>}
     </li>
   )
 }

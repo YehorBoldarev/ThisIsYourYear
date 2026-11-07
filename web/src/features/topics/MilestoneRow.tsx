@@ -26,8 +26,8 @@ export function MilestoneRow({ goal, accent, onToggle, onEdit, onDelete }: Miles
         aria-label={done ? `Reopen ${goal.title}` : `Complete ${goal.title}`}
         className={cn(
           'grid size-[22px] shrink-0 place-items-center rounded-full border-2 transition-colors cursor-pointer',
-          done && achievement && 'border-gold text-gold',
-          done && !achievement && 'border-transparent text-white',
+          done && achievement && 'border-gold text-gold-ink',
+          done && !achievement && 'border-transparent text-btn-ink',
           !done && 'border-border-input text-transparent hover:border-text-muted',
         )}
         style={done && !achievement ? { background: accent } : undefined}
@@ -45,7 +45,7 @@ export function MilestoneRow({ goal, accent, onToggle, onEdit, onDelete }: Miles
       </span>
 
       {done && achievement && (
-        <span className="label-mono shrink-0 text-[10px] text-gold">Achieved</span>
+        <span className="label-mono shrink-0 text-[10px] text-gold-ink">Achieved</span>
       )}
       {!done && due && (
         <span className="label-mono shrink-0 text-[10px] text-text-muted">Due {due}</span>
@@ -56,7 +56,7 @@ export function MilestoneRow({ goal, accent, onToggle, onEdit, onDelete }: Miles
           type="button"
           onClick={() => onEdit(goal)}
           aria-label={`Edit ${goal.title}`}
-          className="grid size-7 place-items-center rounded-full text-text-faint transition-colors hover:text-text cursor-pointer"
+          className="grid size-7 place-items-center rounded-full text-text-muted transition-colors hover:text-text cursor-pointer"
         >
           <Icon name="pencil" size={14} />
         </button>
@@ -64,7 +64,7 @@ export function MilestoneRow({ goal, accent, onToggle, onEdit, onDelete }: Miles
           type="button"
           onClick={() => onDelete(goal)}
           aria-label={`Delete ${goal.title}`}
-          className="grid size-7 place-items-center rounded-full text-text-faint transition-colors hover:text-rose cursor-pointer"
+          className="grid size-7 place-items-center rounded-full text-text-muted transition-colors hover:text-rose cursor-pointer"
         >
           <Icon name="trash" size={14} />
         </button>

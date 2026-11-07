@@ -1,18 +1,22 @@
 /*
  * Design tokens — the single source of truth for color, shape, and elevation.
- * Values are transcribed verbatim from design_handoff_this_is_your_year/README.md
- * ("Design Tokens"). Dark is the default (:root); light overrides via
- * [data-theme='light']. Components consume these semantic roles only — never a
- * raw hex — so one attribute on <html> swaps the whole app.
+ * Values are transcribed from design_handoff_this_is_your_year/README.md
+ * ("Design Tokens"), with the text roles adjusted to meet WCAG AA (4.5:1 for
+ * text, 3:1 for icons) on every surface they sit on; contrast.test.ts enforces
+ * it. Dark is the default (:root); light overrides via [data-theme='light'].
+ * Components consume these semantic roles only — never a raw hex — so one
+ * attribute on <html> swaps the whole app.
+ *
+ * Accents have two roles: the accent itself is for fills, strokes and borders
+ * (rings, bars, swatches, the medallion), and `-ink` is for text and glyphs in
+ * that accent. In dark they're identical; light needs deeper inks because the
+ * bright fills can't reach text contrast on paper.
  */
 
 :root,
 :root[data-theme='dark'] {
   /* Surfaces */
-  --bg: #0c0b08;
-  --bg-radial-from: #1c1a14;
-  --bg-radial-to: #0c0b08;
-  --surface: #131210;
+  --surface: #131210; /* page */
   --bar: #16140f; /* header & footer */
   --surface-elevated: #1a1813; /* popups */
   --input-bg: #16140f;
@@ -28,9 +32,8 @@
   /* Text */
   --text: #ece8e1;
   --text-2: #b3ada3;
-  --text-muted: #8a847a;
-  --text-faint: #55504a;
-  --text-label: #6b6459;
+  --text-muted: #8e897f;
+  --text-faint: #55504a; /* decorative / disabled only — not for readable text */
 
   /* Accents */
   --accent-teal: #3ec5a0;
@@ -41,11 +44,19 @@
   --accent-gold-deep: #e8b765;
   --accent-rose: #c2738f;
 
+  /* Accent inks — text and glyphs in an accent colour. */
+  --accent-teal-ink: #3ec5a0;
+  --accent-teal-ink-hover: #4fd3ae;
+  --accent-blue-ink: #5b8def;
+  --accent-gold-ink: #e8b765;
+
   /* Progress */
   --track: #2a2722;
 
-  /* Ink on accent-filled buttons (dark theme: dark ink on bright accents). */
+  /* Ink on accent fills: buttons, done-milestone checks (dark ink on bright accents). */
   --btn-ink: #0d0c0a;
+  --danger-ink: #0d0c0a; /* on the rose danger button */
+  --avatar-ink: #0d0c0a; /* initials on the teal→blue avatar gradient */
 
   /* Elevation */
   --elev-card: 0 16px 50px rgba(0, 0, 0, 0.45);
@@ -56,10 +67,7 @@
 
 :root[data-theme='light'] {
   /* Surfaces */
-  --bg: #e3d9c8;
-  --bg-radial-from: #efe7da;
-  --bg-radial-to: #e3d9c8;
-  --surface: #faf6ee; /* paper */
+  --surface: #faf6ee; /* paper — the page */
   --bar: #ffffff; /* header & footer */
   --surface-elevated: #ffffff; /* white card / popups */
   --input-bg: #faf6ee;
@@ -74,10 +82,9 @@
 
   /* Text */
   --text: #2b2620;
-  --text-2: #6e665a;
-  --text-muted: #9c9384;
-  --text-faint: #9a9184;
-  --text-label: #b7ad9c;
+  --text-2: #5e564b;
+  --text-muted: #71685b;
+  --text-faint: #9a9184; /* decorative / disabled only — not for readable text */
 
   /* Accents */
   --accent-teal: #2f9e7e;
@@ -86,13 +93,21 @@
   --accent-gold: #d29b3f;
   --accent-gold-hover: #dcab57;
   --accent-gold-deep: #b8841f;
-  --accent-rose: #c2738f;
+  --accent-rose: #a8496b;
+
+  /* Accent inks — deeper than the fills so text passes AA on paper. */
+  --accent-teal-ink: #23765e;
+  --accent-teal-ink-hover: #1b5e4b;
+  --accent-blue-ink: #2f63d3;
+  --accent-gold-ink: #8a6220;
 
   /* Progress */
   --track: #ece4d6;
 
-  /* Ink on accent-filled buttons (light theme: white ink on medium accents). */
-  --btn-ink: #ffffff;
+  /* Ink on accent fills: buttons, done-milestone checks (dark ink on medium accents). */
+  --btn-ink: #2b2620;
+  --danger-ink: #ffffff; /* on the rose danger button */
+  --avatar-ink: #ffffff; /* initials on the teal→blue avatar gradient */
 
   /* Elevation */
   --elev-card: 0 16px 50px rgba(120, 100, 70, 0.13);

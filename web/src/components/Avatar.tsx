@@ -11,7 +11,7 @@ export function Avatar({ initials, size = 38, className }: AvatarProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-full font-bold text-btn-ink',
+        'inline-flex items-center justify-center rounded-full font-bold text-avatar-ink',
         className,
       )}
       style={{

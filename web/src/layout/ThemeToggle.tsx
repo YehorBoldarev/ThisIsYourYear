@@ -20,7 +20,7 @@ function Option({ option, active, size, onSelect }: OptionProps) {
       onClick={() => onSelect(option)}
       className={cn(
         'grid place-items-center rounded-full transition-colors cursor-pointer',
-        active ? 'bg-fill-raised text-gold shadow-sm' : 'text-text-muted hover:text-text',
+        active ? 'bg-fill-raised text-gold-ink shadow-sm' : 'text-text-muted hover:text-text',
       )}
       style={{ width: size, height: size }}
     >

@@ -1,6 +1,6 @@
 import { Button, Icon, Modal, Ring } from '../../components'
 import { ACCENT_HEX } from '../../components/accent'
-import { motivationBand } from '../../lib/motivation'
+import { bandToneClass } from '../../lib/motivation'
 import type { Topic } from './useTopics'
 import { useTopicGoals, type Goal } from './useTopicGoals'
 import { useToggleGoalDone } from './mutations'
@@ -42,14 +42,14 @@ export function TopicDetailModal({
 
   const accent = topic.color || ACCENT_HEX.teal
   const { total, completed, ratio } = topic.progress
-  const band = motivationBand(ratio, total)
+  const motivation = topic.motivation
   const remaining = total - completed
   const bandLine =
     total === 0
       ? 'No milestones yet'
       : remaining === 0
         ? 'Complete · a promise kept'
-        : `${band.shortLabel} · ${remaining} milestone${remaining === 1 ? '' : 's'} to go`
+        : `${motivation.label} · ${remaining} milestone${remaining === 1 ? '' : 's'} to go`
 
   const eyebrow = topic.category ? `Big goal · ${topic.category}` : 'Big goal'
 
@@ -57,14 +57,18 @@ export function TopicDetailModal({
     <Modal open onClose={onClose} eyebrow={eyebrow} title={topic.title} width={720}>
       {topic.description && <p className="-mt-2 mb-4 text-sm text-text-2">{topic.description}</p>}
 
-      {/* Motivational callout — the shared four-band copy (accent border + tint). */}
-      <blockquote
-        className="mb-6 rounded-field border-l-2 py-3 pl-4 pr-3"
-        style={{ borderColor: accent, background: `${accent}14` }}
-      >
-        <div className={`label-mono text-[10px] ${band.toneClass}`}>{band.title}</div>
-        <p className="mt-1 font-serif text-[15px] italic text-text-2">{band.message}</p>
-      </blockquote>
+      {/* Motivational callout — the server's band copy (accent border + tint). */}
+      {motivation.message && (
+        <blockquote
+          className="mb-6 rounded-field border-l-2 py-3 pl-4 pr-3"
+          style={{ borderColor: accent, background: `${accent}14` }}
+        >
+          <div className={`label-mono text-[10px] ${bandToneClass(motivation.band)}`}>
+            {motivation.title}
+          </div>
+          <p className="mt-1 font-serif text-[15px] italic text-text-2">{motivation.message}</p>
+        </blockquote>
+      )}
 
       {/* Progress block. */}
       <div className="flex items-center gap-5 border-y border-border py-5">
@@ -84,7 +88,7 @@ export function TopicDetailModal({
           <button
             type="button"
             onClick={onAddMilestone}
-            className="label-mono flex items-center gap-1 text-[11px] text-teal transition-colors hover:text-teal-hover cursor-pointer"
+            className="label-mono flex items-center gap-1 text-[11px] text-teal-ink transition-colors hover:text-teal-ink-hover cursor-pointer"
           >
             <Icon name="plus" size={12} />
             Add milestone
@@ -124,7 +128,7 @@ export function TopicDetailModal({
         <button
           type="button"
           onClick={onDeleteTopic}
-          className="label-mono flex items-center gap-1 text-[11px] text-text-faint transition-colors hover:text-rose cursor-pointer"
+          className="label-mono flex items-center gap-1 text-[11px] text-text-muted transition-colors hover:text-rose cursor-pointer"
         >
           <Icon name="trash" size={13} />
           Delete chapter

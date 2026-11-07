@@ -64,10 +64,10 @@ npm test           # Vitest (run once)  ·  npm run test:watch
   by TanStack Query.
 - **Dashboard** — `src/features/dashboard/Dashboard.tsx`: date eyebrow + greeting,
   the italic sub-message, the year-progress bar ("YOU ARE HERE · N% · D days left"),
-  and "The chapters" list (per-topic accent bar, ★ ACHIEVED at 100%, status ·
+  and "The chapters" list (per-topic accent bar, ✓ COMPLETE at 100%, status ·
   done/total, percent, mini bar). Loading / error / empty states included.
-- **Derivations** — `src/lib/motivation.ts` (ratio → band short label; extended in
-  B5) and `src/lib/greeting.ts` (time-of-day greeting).
+- **Derivations** — `src/lib/greeting.ts` (time-of-day greeting). Motivation copy comes
+  from the API (see B5 below).
 - Opening a chapter and creating goals/milestones are wired up in **B4** below.
 
 ## What's here (B4 — topic & milestone flows)
@@ -90,11 +90,11 @@ npm test           # Vitest (run once)  ·  npm run test:watch
 
 ## What's here (B5 — achievements, celebration & motivation)
 
-- **Motivation system** — `src/lib/motivation.ts` is the single source of truth:
-  `motivationBand(ratio, total)` returns the design's `{ band, tone, toneClass,
-  shortLabel, title, message }` for the four bands (Just started / Building momentum /
-  In sight / A promise kept). Consumed by the dashboard chapter rows and the
-  topic-detail callout.
+- **Motivation system** — the API computes the copy for the design's four bands (Just
+  started / Building momentum / In sight / A promise kept) and returns it on every topic as
+  `motivation: { band, label, title, message }` (source: `internal/domain/motivation.go`).
+  The chapter rows and topic-detail callout render it as-is; `src/lib/motivation.ts` only
+  maps `band` → tone colour via `bandToneClass`.
 - **Celebration** — `src/features/celebration/CelebrationModal.tsx` (design screen 7):
   gold star-in-glow medallion, the `Confetti` primitive (`src/components/Confetti.tsx`,
   skipped under `prefers-reduced-motion`), a congratulatory quote, and a computed stat
@@ -118,9 +118,11 @@ npm test           # Vitest (run once)  ·  npm run test:watch
   `src/styles/global.css` neutralizes skeleton pulses and hover transitions, on top of
   the JS gate that removes confetti entirely.
 - **Automated a11y gate** — `src/test/a11y.test.tsx` runs **axe** (`vitest-axe`) over the
-  login screen, a populated dashboard, the Wins page, and an open modal. Colour contrast
-  is verified analytically (jsdom doesn't compute CSS colours); see the B6 note in
-  `../docs/dev_run.md` about the light-theme palette AA gap awaiting a design decision.
+  login screen, a populated dashboard, the Wins page, and an open modal. jsdom can't compute
+  colour contrast, so `src/styles/contrast.test.ts` checks it analytically: every text token
+  against every surface in `tokens.css`, both themes, at WCAG AA. Accent-coloured text uses the
+  `-ink` utilities (`text-teal-ink`, `text-gold-ink`, `text-blue-ink`); the plain accent
+  utilities are for fills, strokes and borders.
 
 ## Component gallery
 

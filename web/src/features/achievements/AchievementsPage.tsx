@@ -11,7 +11,7 @@ export function AchievementsPage() {
   return (
     <div className="mx-auto w-full max-w-[680px] px-6 py-12">
       <div className="text-center">
-        <div className="label-mono text-[11px] text-gold">Wins</div>
+        <div className="label-mono text-[11px] text-gold-ink">Wins</div>
         <h1 className="mt-3 font-serif text-3xl font-medium text-text">Your achievements</h1>
         <p className="mt-3 font-serif text-lg italic text-text-2">
           {items.length === 0
@@ -36,11 +36,11 @@ export function AchievementsPage() {
 /** Zero derived wins — encourages starring a milestone. */
 function WinsEmptyState() {
   return (
-    <div className="mt-10 flex flex-col items-center rounded-card border border-border-subtle bg-surface px-6 py-12 text-center">
+    <div className="mt-10 flex flex-col items-center rounded-card border border-border-subtle bg-elevated px-6 py-12 text-center">
       <Logo progress={0.06} size={56} />
       <p className="mt-6 max-w-[400px] text-sm text-text-2">
-        Mark a milestone as an achievement <span className="text-gold">★</span> when you create it —
-        finishing it lands the win here.
+        Mark a milestone as an achievement <span className="text-gold-ink">★</span> when you create
+        it — finishing it lands the win here.
       </p>
     </div>
   )

@@ -8,8 +8,6 @@ interface CelebrationModalProps {
   topic: Topic
   /** The full topic list, for the "#N of {year}" rank. */
   allTopics: Topic[]
-  /** "Reflect on it" — go write a reflection. */
-  onReflect: () => void
   /** "Keep the momentum" / Esc / backdrop — dismiss and return. */
   onClose: () => void
 }
@@ -17,8 +15,13 @@ interface CelebrationModalProps {
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])'
 
-/** The 100% celebration (design screen 7): medallion, quote, stat strip, actions. */
-export function CelebrationModal({ topic, allTopics, onReflect, onClose }: CelebrationModalProps) {
+/**
+ * The 100% celebration (design screen 7): medallion, quote, stat strip, action.
+ * Completing a big goal is not a ★ win (those are user-starred milestones, listed
+ * on the Wins page), so the copy says "complete" rather than "achievement". The
+ * design's "Reflect on it" action returns once Reflections exists.
+ */
+export function CelebrationModal({ topic, allTopics, onClose }: CelebrationModalProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const openerRef = useRef<Element | null>(null)
   const titleId = useId()
@@ -98,8 +101,8 @@ export function CelebrationModal({ topic, allTopics, onReflect, onClose }: Celeb
           </svg>
         </div>
 
-        <div className="label-mono mt-[18px] text-[11px] tracking-[0.2em] text-gold">
-          Achievement unlocked
+        <div className="label-mono mt-[18px] text-[11px] tracking-[0.2em] text-gold-ink">
+          Big goal complete
         </div>
         <h2 id={titleId} className="mt-2 font-serif text-3xl font-semibold text-text">
           {topic.title}
@@ -117,9 +120,6 @@ export function CelebrationModal({ topic, allTopics, onReflect, onClose }: Celeb
         </div>
 
         <div className="mt-6 flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onReflect}>
-            Reflect on it
-          </Button>
           <Button variant="gold" className="flex-1" onClick={onClose}>
             Keep the momentum →
           </Button>
@@ -133,7 +133,9 @@ export function CelebrationModal({ topic, allTopics, onReflect, onClose }: Celeb
 function Stat({ value, label, gold }: { value: string; label: string; gold?: boolean }) {
   return (
     <div>
-      <div className={`font-serif text-[22px] font-semibold ${gold ? 'text-gold' : 'text-text'}`}>
+      <div
+        className={`font-serif text-[22px] font-semibold ${gold ? 'text-gold-ink' : 'text-text'}`}
+      >
         {value}
       </div>
       <div className="label-mono mt-0.5 text-[10px] text-text-muted">{label}</div>

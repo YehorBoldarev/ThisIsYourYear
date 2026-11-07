@@ -55,7 +55,7 @@ func TestDashboardFlow_EmptyThenAggregates(t *testing.T) {
 	require.Equal(t, 4, view.Progress.Total)
 	require.Equal(t, 3, view.Progress.Completed)
 	require.InDelta(t, 0.75, view.Progress.Ratio, 1e-9)
-	require.Equal(t, domain.Motivate(domain.ComputeProgress(4, 3)), view.Message,
+	require.Equal(t, domain.Motivate(domain.ComputeProgress(4, 3)).Message, view.Message,
 		"message tracks the overall progress")
 }
 

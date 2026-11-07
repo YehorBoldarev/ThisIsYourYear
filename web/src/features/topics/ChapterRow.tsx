@@ -1,14 +1,16 @@
 import { Icon, ProgressBar } from '../../components'
-import { motivationBand } from '../../lib/motivation'
 import { useTopicModals } from './topicModalsContext'
 import type { Topic } from './useTopics'
 
-/** An "Achieved" gold tag shown when a chapter reaches 100%. */
-function AchievedTag() {
+/**
+ * A "Complete" tag shown when a chapter reaches 100%. Deliberately a check, not
+ * the ★ — the star and "Achieved" mean a user-starred milestone (a Wins entry).
+ */
+function CompleteTag() {
   return (
-    <span className="label-mono inline-flex items-center gap-1 text-[10px] text-gold">
-      <Icon name="star" size={11} />
-      Achieved
+    <span className="label-mono inline-flex items-center gap-1 text-[10px] text-gold-ink">
+      <Icon name="check" size={11} />
+      Complete
     </span>
   )
 }
@@ -19,8 +21,9 @@ export function ChapterRow({ topic }: { topic: Topic }) {
   const percent = Math.round(ratio * 100)
   const achieved = total > 0 && ratio >= 1
   const accent = topic.color || 'var(--accent-teal)'
-  const { shortLabel } = motivationBand(ratio, total)
-  const statusLine = `${shortLabel} · ${completed}/${total} milestone${total === 1 ? '' : 's'}`
+  const count = `${completed}/${total} milestone${total === 1 ? '' : 's'}`
+  // An optimistic (not-yet-saved) topic has no server copy yet: show just the count.
+  const statusLine = topic.motivation.label ? `${topic.motivation.label} · ${count}` : count
   const open = () => openDetail(topic)
 
   return (
@@ -37,7 +40,7 @@ export function ChapterRow({ topic }: { topic: Topic }) {
             <span className="truncate font-serif text-[19px] font-semibold text-text">
               {topic.title}
             </span>
-            {achieved && <AchievedTag />}
+            {achieved && <CompleteTag />}
           </div>
           <div className="label-mono mt-1 text-[11px] text-text-muted">{statusLine}</div>
         </div>
@@ -57,7 +60,7 @@ export function ChapterRow({ topic }: { topic: Topic }) {
       <button
         type="button"
         onClick={open}
-        className="w-full rounded-field border border-border bg-surface p-4 text-left sm:hidden"
+        className="w-full rounded-field border border-border bg-elevated p-4 text-left sm:hidden"
         style={{ borderLeft: `3px solid ${accent}` }}
       >
         <div className="flex items-center justify-between gap-2">
@@ -67,7 +70,7 @@ export function ChapterRow({ topic }: { topic: Topic }) {
           <span className="shrink-0 font-serif text-text-2">{percent}%</span>
         </div>
         <div className="label-mono mt-1 flex items-center gap-2 text-[11px] text-text-muted">
-          {achieved && <AchievedTag />}
+          {achieved && <CompleteTag />}
           <span>{statusLine}</span>
         </div>
         <ProgressBar value={ratio} height={6} color={accent} className="mt-3" label={topic.title} />

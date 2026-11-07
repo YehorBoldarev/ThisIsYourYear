@@ -56,7 +56,7 @@ describe('Dashboard', () => {
       ),
     )
     renderDashboard()
-    await waitFor(() => expect(screen.getAllByText('Achieved').length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getAllByText('Complete').length).toBeGreaterThan(0))
   })
 
   it('shows the empty state when there are no chapters', async () => {

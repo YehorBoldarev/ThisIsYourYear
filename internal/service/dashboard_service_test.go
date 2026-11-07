@@ -66,7 +66,7 @@ func TestDashboardService_AggregatesAcrossTopics(t *testing.T) {
 	require.Equal(t, 9, view.Progress.Total, "4+2+3 goals")
 	require.Equal(t, 4, view.Progress.Completed, "1+0+3 done")
 	require.InDelta(t, 4.0/9.0, view.Progress.Ratio, 1e-9)
-	require.Equal(t, domain.Motivate(view.Progress), view.Message, "message tracks overall progress")
+	require.Equal(t, domain.Motivate(view.Progress).Message, view.Message, "message tracks overall progress")
 }
 
 func TestDashboardService_ExcludesOtherYearsAndArchived(t *testing.T) {

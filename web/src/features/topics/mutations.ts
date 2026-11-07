@@ -109,7 +109,8 @@ export function useCreateTopic() {
         targetDate: body.targetDate ?? '',
         archived: false,
         progress: { total: 0, completed: 0, ratio: 0 },
-        motivation: '',
+        // Copy is server-computed; the refetch on settle fills it in.
+        motivation: { band: 'not-started', label: '', title: '', message: '' },
         createdAt: now(),
         updatedAt: now(),
       }

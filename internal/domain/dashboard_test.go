@@ -45,7 +45,7 @@ func TestDashboardMessage(t *testing.T) {
 		t.Fatalf("no topics message = %q, want empty-state %q", got, want)
 	}
 	// With topics, it reuses the per-topic bands.
-	if got, want := DashboardMessage(ComputeProgress(2, 2), 1), Motivate(ComputeProgress(2, 2)); got != want {
+	if got, want := DashboardMessage(ComputeProgress(2, 2), 1), Motivate(ComputeProgress(2, 2)).Message; got != want {
 		t.Fatalf("has-topics message = %q, want Motivate band %q", got, want)
 	}
 	// Topics but no goals is NOT the empty state.

@@ -49,7 +49,7 @@ export function Login() {
       footer={
         <>
           New here?{' '}
-          <Link to="/register" className="text-teal hover:underline">
+          <Link to="/register" className="text-teal-ink hover:underline">
             Create an account
           </Link>
         </>

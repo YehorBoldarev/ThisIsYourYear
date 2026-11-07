@@ -28,7 +28,7 @@ func DashboardMessage(overall Progress, topicCount int) string {
 	if topicCount == 0 {
 		return dashboardEmptyMessage
 	}
-	return Motivate(overall)
+	return Motivate(overall).Message
 }
 
 // NextNewYear returns the instant of the next New Year — Jan 1, 00:00:00 of the

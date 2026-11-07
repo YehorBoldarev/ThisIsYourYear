@@ -8,7 +8,6 @@
  * so every utility follows the active `data-theme` at runtime.
  */
 @theme inline {
-  --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-bar: var(--bar);
   --color-elevated: var(--surface-elevated);
@@ -25,7 +24,6 @@
   --color-text-2: var(--text-2);
   --color-text-muted: var(--text-muted);
   --color-text-faint: var(--text-faint);
-  --color-text-label: var(--text-label);
 
   --color-teal: var(--accent-teal);
   --color-teal-hover: var(--accent-teal-hover);
@@ -34,8 +32,14 @@
   --color-gold-hover: var(--accent-gold-hover);
   --color-gold-deep: var(--accent-gold-deep);
   --color-rose: var(--accent-rose);
+  --color-teal-ink: var(--accent-teal-ink);
+  --color-teal-ink-hover: var(--accent-teal-ink-hover);
+  --color-blue-ink: var(--accent-blue-ink);
+  --color-gold-ink: var(--accent-gold-ink);
   --color-track: var(--track);
   --color-btn-ink: var(--btn-ink);
+  --color-danger-ink: var(--danger-ink);
+  --color-avatar-ink: var(--avatar-ink);
 
   --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
@@ -58,13 +62,9 @@
 
   body {
     margin: 0;
-    background-color: var(--bg);
-    background-image: radial-gradient(
-      circle at 50% -10%,
-      var(--bg-radial-from),
-      var(--bg-radial-to)
-    );
-    background-attachment: fixed;
+    /* Pages sit on the paper/page surface, as in the design's page frames. (The
+       handoff's radial "canvas" gradient is only the backdrop behind popups.) */
+    background-color: var(--surface);
     color: var(--text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;

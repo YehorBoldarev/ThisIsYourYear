@@ -19,7 +19,7 @@ export function EmptyState() {
         Create your first big goal
       </Button>
       <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-        <span className="label-mono text-[11px] text-text-faint">Try:</span>
+        <span className="label-mono text-[11px] text-text-muted">Try:</span>
         {EXAMPLES.map((ex) => (
           <Chip key={ex} onClick={openCreate}>
             {ex}

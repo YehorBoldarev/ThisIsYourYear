@@ -18,7 +18,7 @@ const variants: Record<ButtonVariant, string> = {
   gold: 'bg-gold text-btn-ink hover:bg-gold-hover',
   outline:
     'border border-border-popup bg-transparent text-text-2 hover:border-text-muted hover:text-text',
-  danger: 'bg-rose text-white hover:opacity-90',
+  danger: 'bg-rose text-danger-ink hover:opacity-90',
 }
 
 const sizes: Record<ButtonSize, string> = {
