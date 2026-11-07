@@ -27,6 +27,9 @@ make build-all    # self-contained binary with SPA embedded (go build -tags embe
 - **Single integration test:** `go test -tags=integration -run TestName ./internal/repository/`
 - **Integration tests are tag-gated** (`//go:build integration`) so the default `go test`
   stays fast and Docker-free. They need a Docker daemon.
+- **Backend + Mongo fully in Docker:** `docker compose -f deployments/docker-compose.yml --profile app up --build`.
+- **Lint gotchas** (`.golangci.yml`): revive's `exported` rule is on, so exported Go identifiers
+  need doc comments; `goimports` groups local imports under `kibou/thisisyouryear`.
 
 ### Frontend (from `web/`)
 
@@ -58,8 +61,14 @@ Everything is wired by hand in `cmd/api/main.go`.
   method is scoped by `userID`** — ownership is enforced at the data layer, not by ad-hoc checks.
   Services build "view" structs (e.g. `TopicView` = topic + computed `Progress` + `Motivation`)
   so progress and its message stay in lockstep everywhere.
-- **`internal/repository`** — MongoDB implementations of the service ports; register indexes on
-  construction (`EnsureIndexes` runs after they're built).
+- **`internal/repository`** — MongoDB implementations of the service ports, built on the generic
+  `Repository[T, PT]` base in `internal/platform/mongo` (CRUD/count/aggregate over one collection;
+  entities embed `Document`). They register indexes on construction (`EnsureIndexes` runs after
+  they're built).
+- **`internal/auth`** — primitives the auth service composes: bcrypt passwords, HS256 JWT access
+  tokens, and opaque refresh tokens persisted only as a SHA-256 hash (the `sessions` collection).
+  `AuthService.Refresh` **rotates** the session on every use; presenting an already-rotated token
+  is treated as theft and revokes *all* of that user's sessions.
 - **`internal/transport/http`** — chi router, DTOs, handlers, middleware, server lifecycle.
 
 Key cross-cutting conventions (each requires reading several files to see):
@@ -94,8 +103,17 @@ React 19 + Vite + TypeScript (strict) + Tailwind CSS v4 + TanStack Query + react
   settle-invalidate). Feature folders under `src/features/` (dashboard, topics, celebration,
   achievements). There is **no achievements endpoint** — wins are derived client-side by fanning
   `GET /topics/{id}/goals` and filtering `done && isAchievement`.
-- **Motivation** copy has a single source of truth in `src/lib/motivation.ts` (four bands),
-  consumed by both dashboard rows and the topic-detail callout.
+- **Motivation exists twice, and they differ.** The backend (`internal/domain/motivation.go`,
+  six bands) computes the `motivation` string returned on every topic. The UI does **not** render
+  that string: it derives its own copy from the progress ratio via `src/lib/motivation.ts` (four
+  design bands), the single UI source used by dashboard rows and the topic-detail callout. To
+  change what users see, edit the frontend file.
+- **Tests** use MSW: `src/test/msw.ts` holds the shared server, fixtures (`TEST_USER`,
+  `tokenResponse`, `dashboardResponse`, …) and the `errorBody` envelope helper. Override handlers
+  per test with `server.use(...)`. `src/test/a11y.test.tsx` runs axe checks via `vitest-axe`.
+- **Design reference:** `design_handoff_this_is_your_year/` holds the HTML mockups (dark + light
+  themes, desktop/tablet/mobile). Recreate them in React; ignore their templating runtime
+  (`support.js`).
 
 ## Production serving (single origin)
 
@@ -111,7 +129,8 @@ For a **local non-technical demo**, root-level `START-HERE.txt` + `*-website.bat
 
 ## Working conventions in this repo
 
-- Development follows an approval-gated, per-step plan flow: plans live in `plans/`; implementation
-  proceeds one step at a time. **After every implementation step, update `docs/dev_run.md`.**
+- Development follows an approval-gated, per-step plan flow: backend plans live in `plans/`
+  (`00-system-plan.md` + numbered steps), frontend plans in `plans/frontend/` (their own numbered
+  track); implementation proceeds one step at a time. **After every implementation step, update `docs/dev_run.md`.**
 - The OpenAPI contract (`api/openapi.yaml`) is the source of truth for the HTTP API and is embedded
   and served at `GET /openapi.yaml`; keep it and the generated frontend types in sync.
