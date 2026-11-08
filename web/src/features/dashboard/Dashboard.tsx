@@ -7,7 +7,6 @@ import { YearProgress } from './YearProgress'
 import { DashboardSkeleton } from './DashboardSkeleton'
 import { ChaptersSection } from '../topics/ChaptersSection'
 import { EmptyState } from '../topics/EmptyState'
-import { ModalHost } from '../topics/ModalHost'
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
@@ -44,17 +43,14 @@ export function Dashboard() {
   const { data: dash } = dashboard
   const chapters = topics.data
 
-  return (
-    <ModalHost>
-      {chapters.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="mx-auto w-full max-w-[680px] px-6 py-12">
-          <DateGreeting name={user?.displayName ?? ''} message={dash.message} />
-          <YearProgress secondsRemaining={dash.countdown.secondsRemaining} />
-          <ChaptersSection topics={chapters} />
-        </div>
-      )}
-    </ModalHost>
+  // Topic popups come from the app-level ModalHost (see App.tsx).
+  return chapters.length === 0 ? (
+    <EmptyState />
+  ) : (
+    <div className="mx-auto w-full max-w-[680px] px-6 py-12">
+      <DateGreeting name={user?.displayName ?? ''} message={dash.message} />
+      <YearProgress secondsRemaining={dash.countdown.secondsRemaining} />
+      <ChaptersSection topics={chapters} />
+    </div>
   )
 }

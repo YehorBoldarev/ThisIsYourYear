@@ -24,7 +24,8 @@ type State =
 /**
  * Owns which topic popup is open and its target. Renders one modal at a time so
  * focus/scroll management stays clean; child popups opened from the detail view
- * return to it on close. Exposes `openDetail`/`openCreate` to the subtree.
+ * return to it on close. Exposes `openDetail`/`openCreate` to the subtree. Mounted
+ * once, above the routes (App.tsx), so any page or the app chrome can open them.
  */
 export function ModalHost({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ kind: 'none' })

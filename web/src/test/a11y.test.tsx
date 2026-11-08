@@ -9,6 +9,7 @@ import { AuthProvider } from '../auth/AuthProvider'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import { Login } from '../routes/Login'
 import { Dashboard } from '../features/dashboard/Dashboard'
+import { ModalHost } from '../features/topics/ModalHost'
 import { AchievementsPage } from '../features/achievements/AchievementsPage'
 import { TopicFormModal } from '../features/topics/TopicFormModal'
 
@@ -61,7 +62,9 @@ describe('accessibility (axe)', () => {
         <QueryClientProvider client={client()}>
           <AuthProvider>
             <ThemeProvider>
-              <Dashboard />
+              <ModalHost>
+                <Dashboard />
+              </ModalHost>
             </ThemeProvider>
           </AuthProvider>
         </QueryClientProvider>

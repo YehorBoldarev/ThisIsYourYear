@@ -101,7 +101,8 @@ React 19 + Vite + TypeScript (strict) + Tailwind CSS v4 + TanStack Query + react
   middleware). Requests are **same-origin**, so the cookie is sent without `credentials: 'include'`.
 - **Server state** is TanStack Query; mutations are optimistic (update cache → rollback →
   settle-invalidate). Feature folders under `src/features/` (dashboard, topics, celebration,
-  achievements). There is **no achievements endpoint** — wins are derived client-side by fanning
+  achievements). Topic popups are app-level: one `ModalHost` sits above the routes in `App.tsx`;
+  open them with `useTopicModals()` (`openDetail`/`openCreate`) from any page or the shell. There is **no achievements endpoint** — wins are derived client-side by fanning
   `GET /topics/{id}/goals` and filtering `done && isAchievement`.
 - **Motivation copy is server-owned.** `internal/domain/motivation.go` holds the design's four
   bands (80% "almost there" threshold) and all copy; topics carry `motivation: {band, label,
@@ -136,6 +137,7 @@ For a **local non-technical demo**, root-level `START-HERE.txt` + `*-website.bat
 
 - Development follows an approval-gated, per-step plan flow: backend plans live in `plans/`
   (`00-system-plan.md` + numbered steps), frontend plans in `plans/frontend/` (their own numbered
-  track); implementation proceeds one step at a time. **After every implementation step, update `docs/dev_run.md`.**
+  track); implementation proceeds one step at a time. Postponed features and known small issues
+  are tracked in `plans/backlog.md`. **After every implementation step, update `docs/dev_run.md`.**
 - The OpenAPI contract (`api/openapi.yaml`) is the source of truth for the HTTP API and is embedded
   and served at `GET /openapi.yaml`; keep it and the generated frontend types in sync.

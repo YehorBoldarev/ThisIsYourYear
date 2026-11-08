@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { AppShell } from './AppShell'
 import { ThemeProvider } from '../theme/ThemeProvider'
@@ -8,14 +9,14 @@ import { AuthProvider } from '../auth/AuthProvider'
 import { THEME_STORAGE_KEY, type Theme } from '../theme/theme'
 import { server, TEST_USER, tokenResponse } from '../test/msw'
 
-async function renderShell(theme: Theme) {
+async function renderShell(theme: Theme, onNew = vi.fn()) {
   localStorage.setItem(THEME_STORAGE_KEY, theme)
   server.use(http.post('/api/v1/auth/refresh', () => HttpResponse.json(tokenResponse())))
   render(
     <ThemeProvider>
       <AuthProvider>
         <MemoryRouter>
-          <AppShell>
+          <AppShell onNew={onNew}>
             <p>content</p>
           </AppShell>
         </MemoryRouter>
@@ -51,5 +52,12 @@ describe('AppShell', () => {
       .filter((l) => l.getAttribute('aria-current') === 'page')
     expect(current.length).toBeGreaterThan(0)
     expect(current.some((l) => /Dashboard|Goals/.test(l.textContent ?? ''))).toBe(true)
+  })
+
+  it("wires the mobile tab bar's New button to onNew", async () => {
+    const onNew = vi.fn()
+    await renderShell('dark', onNew)
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(onNew).toHaveBeenCalledOnce()
   })
 })

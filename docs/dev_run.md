@@ -382,6 +382,15 @@ This path is a **local single-machine demo**, distinct from the production guida
 
 ## Changelog
 
+- **Fix — Mobile "New ＋" tab did nothing:** the tab bar lives in the app shell, but the topic
+  popups were owned by a `ModalHost` inside the Dashboard page, so the shell passed it a no-op.
+  `ModalHost` now sits once above the routes (`App.tsx`), making the topic popups app-level; the
+  tab opens "Create a big goal" over the dashboard from any page (navigating there first, so the
+  saved chapter is visible). `AppShell` takes an `onNew` prop. Added an app-level test (Wins →
+  tap New → create popup over the dashboard), confirmed to fail on the old no-op. Also started
+  `plans/backlog.md` for postponed features (year rollover, Reflections, reordering, …) and known
+  small issues. Verified: web typecheck/ESLint/Prettier/Vitest (178)/build green.
+
 - **Fix — Big-goal completion no longer claims to be an achievement:** in this app a ★
   achievement (a Wins entry) is a milestone the user starred, but finishing a whole big goal
   showed "Achievement unlocked", a "★ Achieved" chapter tag and an "Achieved" status label —

@@ -7,9 +7,10 @@ import { useAuth } from '../auth/useAuth'
 
 /**
  * App chrome: header + routed content + footer, plus the mobile bottom tab bar.
- * Rendered only inside RequireAuth, so a user is always present.
+ * Rendered only inside RequireAuth, so a user is always present. `onNew` is the
+ * tab bar's "New ＋" (create a big goal).
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, onNew }: { children: ReactNode; onNew: () => void }) {
   const { user, logout } = useAuth()
   const yearProgress = yearElapsedFraction()
 
@@ -29,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <Footer />
-      <BottomTabBar onNew={() => {}} />
+      <BottomTabBar onNew={onNew} />
     </div>
   )
 }
