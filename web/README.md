@@ -9,7 +9,7 @@ data (B3), the **topic & milestone CRUD modals** with optimistic updates (B4), t
 
 ## Prerequisites
 
-- Node 20+ (developed on Node 24), npm 10+.
+- Node 24 (pinned in `.nvmrc`; `nvm use` picks it up), npm 11.
 
 ## Commands
 

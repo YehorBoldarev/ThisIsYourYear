@@ -18,7 +18,7 @@ make compose-up   # start MongoDB (docker compose) — required before running/i
 make run          # go run ./cmd/api  → http://localhost:8080
 make test         # unit tests, race detector (go test -race ./...)
 make test-int     # integration tests — needs Docker (testcontainers spins up Mongo)
-make fmt vet lint tidy   # gofmt -w · go vet · golangci-lint · go mod tidy
+make fmt vet lint tidy   # go fmt · go vet · golangci-lint · go mod tidy
 make build        # backend-only binary → ./bin/api (no embedded SPA)
 make build-all    # self-contained binary with SPA embedded (go build -tags embedui)
 ```
@@ -28,8 +28,15 @@ make build-all    # self-contained binary with SPA embedded (go build -tags embe
 - **Integration tests are tag-gated** (`//go:build integration`) so the default `go test`
   stays fast and Docker-free. They need a Docker daemon.
 - **Backend + Mongo fully in Docker:** `docker compose -f deployments/docker-compose.yml --profile app up --build`.
-- **Lint gotchas** (`.golangci.yml`): revive's `exported` rule is on, so exported Go identifiers
-  need doc comments; `goimports` groups local imports under `kibou/thisisyouryear`.
+- **Lint gotchas** (`.golangci.yml`, **v2 format**, no exclusion presets): revive's `exported` rule
+  is enforced, so exported Go identifiers need doc comments; `goimports` groups local imports under
+  `kibou/thisisyouryear`. Deliberate exceptions are inline `//nolint:<linter> // reason`.
+  golangci-lint is **pinned** (`GOLANGCI_LINT_VERSION` in the Makefile *and*
+  `.github/workflows/ci.yml` — bump both); `make lint` builds it into `./bin` on first use.
+- **Build tags:** `make vet`/`make lint` run twice, `-tags=integration` and `-tags=embedui`,
+  because that pair covers every file (`fs_noembed.go` is `!embedui`).
+- **`go.mod` has `ignore ./web/node_modules`:** an npm package ships a `.go` file that `./...`
+  would otherwise pick up. Keep it; prefer `go fmt ./...` over `gofmt -w .` for the same reason.
 
 ### Frontend (from `web/`)
 
@@ -132,6 +139,20 @@ pre-paint theme script to stay external (`web/public/theme-init.js`), not inline
 
 For a **local non-technical demo**, root-level `START-HERE.txt` + `*-website.bat` +
 `deployments/docker-compose.customer.yml` launch the whole stack by double-click (see `docs/dev_run.md` §6.1).
+
+The `Dockerfile` builds **multi-arch** (amd64 + arm64 for the Raspberry Pi host): build stages run on
+`$BUILDPLATFORM` and Go cross-compiles via `TARGETOS`/`TARGETARCH` — keep it pure Go
+(`CGO_ENABLED=0`) or this breaks. The web stage must copy `web/.npmrc` (`legacy-peer-deps`) before
+`npm ci`.
+
+## CI/CD (GitHub Actions)
+
+`.github/workflows/ci.yml` on push/PR to **`master`** (production branch), `v*` tags and manual
+dispatch: `backend` (gofmt, tidy check, vet, golangci-lint, unit) · `backend-integration` ·
+`frontend` (incl. a `gen:api` drift check — a stale `schema.d.ts` fails CI) run in parallel; `docker`
+then builds amd64+arm64 and, on `master`/tags only, pushes `ghcr.io/yehorboldarev/thisisyouryear`
+(`:latest`, `:sha-<short>`, semver). Node is **24** everywhere (`web/.nvmrc`). Deployment to the
+Pi is pull-based (plan C3), so CI has no deploy job and no secrets.
 
 ## Working conventions in this repo
 

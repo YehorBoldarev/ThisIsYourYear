@@ -15,6 +15,7 @@ const (
 // GoalStatus is the lifecycle state of a goal.
 type GoalStatus string
 
+// The two goal states. The values are stable wire identifiers.
 const (
 	GoalStatusTodo GoalStatus = "todo"
 	GoalStatusDone GoalStatus = "done"

@@ -3,6 +3,11 @@
 COMPOSE := docker compose -f deployments/docker-compose.yml
 PKG     := ./...
 
+# golangci-lint is pinned here and in .github/workflows/ci.yml; bump both together.
+# `make lint` builds exactly this version into ./bin on first use (no global install).
+GOLANGCI_LINT_VERSION := v2.15.0
+GOLANGCI_LINT         := bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -39,16 +44,25 @@ test-int: ## Run integration tests (opt-in; requires Docker for testcontainers).
 	go test -race -tags=integration $(PKG)
 
 .PHONY: fmt
-fmt: ## Format all Go source.
-	gofmt -w .
+fmt: ## Format all Go source (skips web/node_modules via the go.mod ignore directive).
+	go fmt $(PKG)
 
+# Build tags: `integration` adds the integration tests to the default file set, and
+# `embedui` swaps in the embedded-SPA file, so these two passes cover every Go file.
 .PHONY: vet
-vet: ## Run go vet.
-	go vet $(PKG)
+vet: ## Run go vet over all build-tag combinations.
+	go vet -tags=integration $(PKG)
+	go vet -tags=embedui $(PKG)
+
+$(GOLANGCI_LINT):
+	@mkdir -p bin
+	GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	@mv bin/golangci-lint $@
 
 .PHONY: lint
-lint: ## Run golangci-lint (requires golangci-lint installed).
-	golangci-lint run
+lint: $(GOLANGCI_LINT) ## Run golangci-lint (pinned version) over all build-tag combinations.
+	$(GOLANGCI_LINT) run --build-tags=integration $(PKG)
+	$(GOLANGCI_LINT) run --build-tags=embedui $(PKG)
 
 .PHONY: tidy
 tidy: ## Tidy and verify module dependencies.

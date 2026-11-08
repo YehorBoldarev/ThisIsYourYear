@@ -17,8 +17,10 @@ import (
 type Environment string
 
 const (
+	// EnvDevelopment relaxes defaults for local work (loads .env, allows the dev JWT secret).
 	EnvDevelopment Environment = "development"
-	EnvProduction  Environment = "production"
+	// EnvProduction enforces production-only checks (e.g. a real JWT_SECRET) and ignores .env.
+	EnvProduction Environment = "production"
 )
 
 // devJWTSecret is the throwaway signing secret used when none is configured. It

@@ -1,0 +1,23 @@
+# Keep the build context small and free of host artifacts and secrets.
+# The Dockerfile installs and builds everything it needs inside the image.
+
+# VCS and editor state
+.git
+.idea
+.vscode
+
+# Secrets must never reach an image layer (even an intermediate one).
+.env
+**/.env
+
+# Host build output and dependencies — rebuilt inside the image. Copying the
+# host's node_modules would overwrite the image's `npm ci` result.
+bin
+web/node_modules
+web/dist
+internal/transport/http/webui/dist/*
+!internal/transport/http/webui/dist/.gitkeep
+
+# Test and coverage artifacts
+coverage.out
+coverage.html

@@ -1,0 +1,12 @@
+# Keeps the pinned GitHub Actions versions in .github/workflows current.
+# Go and npm dependency updates stay manual for now (plan C2, D6).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # One PR per week for all action bumps instead of one per action.
+      github-actions:
+        patterns: ["*"]

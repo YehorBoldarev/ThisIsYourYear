@@ -1,5 +1,7 @@
 # ThisIsYourYear
 
+[![CI](https://github.com/YehorBoldarev/ThisIsYourYear/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/YehorBoldarev/ThisIsYourYear/actions/workflows/ci.yml)
+
 A multi-user web application for tracking yearly goals. Users create big goals
 (**Topics**) and concrete **Goals** beneath them; completing a Goal flagged as an
 achievement becomes a ★ win, and each Topic surfaces a motivational message based on
@@ -22,9 +24,8 @@ detailed run/verify guide.
 ## Requirements
 
 - Go 1.26+
-- Node 20+ and npm 10+ (for the frontend)
-- Docker (MongoDB via docker-compose; also required for integration tests; optional
-  `golangci-lint` for linting)
+- Node 24 (see `web/.nvmrc`) and npm 11 (for the frontend)
+- Docker (MongoDB via docker-compose; also required for integration tests)
 
 ## Getting started (development)
 
@@ -68,7 +69,8 @@ make build-all        # build web/, stage it under the Go embed dir, compile the
 ./bin/api             # serves SPA + API on :8080
 ```
 
-The multi-stage [`Dockerfile`](./Dockerfile) produces the same self-contained image. See
+The multi-stage [`Dockerfile`](./Dockerfile) produces the same self-contained image, for both
+`linux/amd64` and `linux/arm64` (e.g. a Raspberry Pi). See
 [`docs/dev_run.md`](./docs/dev_run.md) §6 for details.
 
 ### One-click local demo (non-technical Windows users)
@@ -84,9 +86,9 @@ Backend (from the repo root — `make help` lists all targets):
 ```bash
 make test      # unit tests (race detector)
 make test-int  # integration tests (requires Docker; //go:build integration)
-make fmt       # gofmt -w
-make vet       # go vet
-make lint      # golangci-lint
+make fmt       # go fmt
+make vet       # go vet (all build tags)
+make lint      # golangci-lint v2, pinned; built into ./bin on first run
 make tidy      # tidy go.mod
 ```
 
@@ -104,6 +106,19 @@ npm run gen:api       # regenerate src/api/schema.d.ts from ../api/openapi.yaml 
 After editing `api/openapi.yaml`, re-run `npm run gen:api` so the generated frontend types
 stay in sync with the contract.
 
+## Continuous integration
+
+GitHub Actions ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) runs on every push
+and pull request to `master`:
+
+- **backend:** gofmt, `go mod tidy` check, `go vet`, golangci-lint, unit tests
+- **backend-integration:** integration tests against real MongoDB containers
+- **frontend:** typecheck, ESLint, Prettier, Vitest, production build, OpenAPI-types drift check
+- **docker:** builds the image for `amd64` + `arm64`; on `master` (and `v*` tags) it is pushed
+  to `ghcr.io/yehorboldarev/thisisyouryear` as `:latest` and `:sha-<commit>`
+
+Each job can be reproduced locally. See [`docs/dev_run.md`](./docs/dev_run.md) §7.
+
 ## Project layout
 
 ```
@@ -119,6 +134,7 @@ internal/transport/http/webui  embedded SPA assets (embedui build tag)
 web                          React + TypeScript single-page app
 api                          OpenAPI 3.1 contract (embedded and served)
 deployments                  docker-compose files
+.github                      CI workflow + Dependabot (GitHub Actions updates)
 docs                         run/verify guide
 plans                        system plan and per-step implementation plans
 ```

@@ -3,9 +3,10 @@
 How to run the backend on your machine, exercise it, and shut it down cleanly.
 
 > **Keep this current:** this document is updated at the end of every implementation
-> step. It reflects the app **as of Step B6 (frontend accessibility & polish — Phase B complete)**.
+> step. It reflects the app **as of Step C2 (CI/CD pipeline)**.
 > Backend is complete through Step 9; the frontend (Phase B) lives in `web/` — see
-> [§5 Frontend](#5-frontend-phase-b) and [`web/README.md`](../web/README.md).
+> [§5 Frontend](#5-frontend-phase-b) and [`web/README.md`](../web/README.md). Production
+> serving is §6 and continuous integration is [§7](#7-continuous-integration-github-actions).
 
 ---
 
@@ -14,8 +15,9 @@ How to run the backend on your machine, exercise it, and shut it down cleanly.
 | Tool | Version | Needed for |
 | --- | --- | --- |
 | Go | 1.26.x (see `go.mod`) | building/running the API, unit tests |
+| Node | 24 (see `web/.nvmrc`), npm 11 | the frontend (`web/`) |
 | Docker | any recent | MongoDB, integration tests, containerized run |
-| `golangci-lint` | v1.64.x | `make lint` (optional but recommended) |
+| `golangci-lint` | v2.15.0 — **no install needed** | `make lint` builds the pinned version into `./bin` on first run |
 | `mongosh` | optional | inspecting the database directly |
 
 All commands below are run from the repository root. `make help` lists every target.
@@ -115,10 +117,19 @@ reuse detection → logout).
 ### 3.2 Static checks
 
 ```bash
-make fmt         # gofmt -w .
-make vet         # go vet
-make lint        # golangci-lint
+make fmt         # go fmt ./...  (skips web/node_modules, see below)
+make vet         # go vet, twice: -tags=integration and -tags=embedui (covers every file)
+make lint        # golangci-lint v2.15.0 (pinned), same two tag passes
 ```
+
+- **Pinned linter:** `make lint` builds golangci-lint at `GOLANGCI_LINT_VERSION` (Makefile) into
+  `./bin/golangci-lint-<version>` the first time (about a minute), then reuses it. CI pins the same
+  version in `.github/workflows/ci.yml`; bump both together. The config (`.golangci.yml`) is in
+  the **v2 format** with no exclusion presets, so revive's doc-comment rule on exported
+  identifiers is enforced; deliberate exceptions are inline `//nolint:<linter> // reason`.
+- **`web/node_modules` is ignored by Go:** an npm package ships a stray `.go` file, which made
+  `./...` pick it up. `go.mod` has `ignore ./web/node_modules` (Go 1.25+), so `go test/vet/fmt
+  ./...` and the linter skip it.
 
 ### 3.3 Manual API smoke test
 
@@ -351,8 +362,13 @@ make build-all        # builds web/ , stages it under the Go embed dir, and
   `/readyz`, `/openapi.yaml` are unaffected. Responses carry baseline security headers
   and a strict **CSP** (`default-src 'self'`, `script-src 'self'`) — the theme bootstrap
   moved to an external `/theme-init.js` so no inline script is needed.
-- **Docker:** the `Dockerfile` is now multi-stage (Node build → Go build with
-  `-tags embedui` → distroless). One image serves everything on `:8080`.
+- **Docker:** the `Dockerfile` is multi-stage (Node build → Go build with
+  `-tags embedui` → distroless). One image serves everything on `:8080`. It builds for
+  **`linux/amd64` and `linux/arm64`** (Raspberry Pi): the build stages run on the builder's own
+  platform and Go cross-compiles, so
+  `docker buildx build --platform linux/amd64,linux/arm64 .` needs no emulation. A plain
+  `docker build .` builds for the local machine. `.dockerignore` keeps `.git`, `.env` files and
+  the host's `node_modules`/build output out of the build context.
 - **Prod config:** leave `CORS_ALLOWED_ORIGINS` **empty** (same origin), keep
   `COOKIE_SECURE=true` (needs TLS), and set a real `JWT_SECRET`. TLS termination / a
   reverse proxy / hosting are a later Phase-C concern.
@@ -380,7 +396,79 @@ This path is a **local single-machine demo**, distinct from the production guida
 
 ---
 
+## 7. Continuous integration (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on every push and pull request to **`master`**, on `v*` tags,
+and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/08-ci-cd-pipeline.md`.
+
+| Job | What it checks | Reproduce locally |
+| --- | --- | --- |
+| `backend` | gofmt · `go mod tidy` leaves no diff · `go vet` · golangci-lint · unit tests | `make fmt vet lint test tidy`, then `git diff` shows nothing |
+| `backend-integration` | integration tests (testcontainers MongoDB) | `make test-int` |
+| `frontend` | `npm ci` · typecheck · ESLint · Prettier · Vitest · build · `schema.d.ts` matches `api/openapi.yaml` | in `web/`: `npm ci && npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && npm run gen:api`, then `git diff src/api/schema.d.ts` shows nothing |
+| `docker` | runs after the three above; builds the image for amd64 + arm64 | `docker buildx build --platform linux/amd64,linux/arm64 .` |
+
+- **Publishing:** on `master` and `v*` tags the `docker` job pushes to
+  **`ghcr.io/yehorboldarev/thisisyouryear`**. Pull requests build but never push.
+  - **`:latest`**: the newest `master` build.
+  - **`:sha-<short commit>`**: every published build, so it doubles as a rollback handle.
+  - **`:X.Y.Z` and `:X.Y`**: added when you push a tag like `v1.2.3`. A version tag never moves
+    `:latest`.
+- **No secrets to configure:** the workflow authenticates to GHCR with the built-in
+  `GITHUB_TOKEN`.
+- **Concurrency:** a new push to a PR cancels that PR's previous run; runs on `master` always
+  finish, so every merged commit gets an image.
+- **Dependabot** (`.github/dependabot.yml`) opens one grouped PR a week when the pinned GitHub
+  Actions have new versions. Go and npm updates stay manual.
+
+### 7.1 One-time GitHub settings (after the first green run)
+
+1. **Make the image public.** On GitHub, open your profile, then *Packages* →
+   *thisisyouryear* → *Package settings* → *Change visibility* → **Public**. Hosts (the
+   Raspberry Pi) can then pull it without credentials.
+2. **Protect `master`.** Go to *Settings* → *Branches* (or *Rules* → *Rulesets*), add a rule for
+   `master` and require the status checks **`backend`**, **`backend-integration`** and
+   **`frontend`**.
+
+---
+
 ## Changelog
+
+- **Step C2 — CI/CD pipeline (GitHub Actions):**
+  - **Workflow:** `.github/workflows/ci.yml` with four jobs.
+    - `backend`, `backend-integration` and `frontend` run in parallel.
+    - `docker` runs after them and builds a multi-arch (amd64 + arm64) image.
+    - On `master` and `v*` tags, `docker` pushes to `ghcr.io/yehorboldarev/thisisyouryear`
+      (`:latest`, `:sha-…`, semver).
+  - **Dependabot:** grouped weekly updates for GitHub Actions.
+  - **golangci-lint v2:**
+    - `.golangci.yml` migrated to the v2 format; no exclusion presets.
+    - v2.15.0 pinned in the Makefile and CI; `make lint` builds it into `./bin`.
+    - `make vet`/`lint` cover both build-tag sets.
+    - The v2 findings were fixed: doc comments on `EnvDevelopment`/`EnvProduction` and the
+      `GoalStatus` constants, and a documented `//nolint:gosec` (G124) on the refresh cookie,
+      whose `Secure` flag is config-driven. The `RefreshCookieConfig` comment no longer claims
+      production can't turn `Secure` off.
+  - **Node 24:** the Dockerfile and CI use Node 24, and a new `web/.nvmrc` pins it.
+  - **Dockerfile:** the build stages run on `$BUILDPLATFORM` and Go cross-compiles to the target.
+  - **Fixes found while verifying:**
+    - **Docker build failed at `npm ci`.** The Dockerfile didn't copy `web/.npmrc`
+      (`legacy-peer-deps`), so the TypeScript 6 / openapi-typescript peer conflict failed the
+      install. It's copied now.
+    - **Go tooling scanned `web/node_modules`.** `./...` matched a stray Go package inside it, so
+      `go.mod` gained `ignore ./web/node_modules` and `make fmt` uses `go fmt`.
+    - **No `.dockerignore`.** Without one, `.git`, `.env` and the host's `node_modules` went into
+      the build context; the new `.dockerignore` keeps them out.
+  - **Verified locally:**
+    - gofmt (empty), `go mod tidy` (no diff), `go vet` on both tag sets, golangci-lint v2.15.0
+      on both tag sets (0 issues), `make test`, `make test-int`;
+    - web typecheck, ESLint, Prettier, Vitest (178), build, `gen:api` (no diff);
+    - actionlint 1.7.12 with shellcheck (clean);
+    - plain `docker build` plus a runtime smoke test (`/healthz`, `/readyz`, `/`, deep link,
+      JSON 404);
+    - `docker buildx` for amd64 + arm64 (the arm64 binary is a static aarch64 ELF);
+    - both compose builds.
+  - **Pending:** the first real Actions run needs a push.
 
 - **Fix — Mobile "New ＋" tab did nothing:** the tab bar lives in the app shell, but the topic
   popups were owned by a `ModalHost` inside the Dashboard page, so the shell passed it a no-op.

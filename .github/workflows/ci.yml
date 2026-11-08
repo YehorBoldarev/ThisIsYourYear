@@ -1,0 +1,183 @@
+# CI/CD — quality gates on every push/PR, and the production image on master.
+# Design: plans/frontend/08-ci-cd-pipeline.md. Every job is reproducible locally;
+# see docs/dev_run.md § "Continuous integration".
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+# Least privilege by default; only the docker job may write packages.
+permissions:
+  contents: read
+
+# One run per ref. A newer push to a PR cancels the superseded run; runs on
+# master and tags always finish so every merged commit gets an image.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pinned here and in the Makefile (GOLANGCI_LINT_VERSION); bump both together.
+  GOLANGCI_LINT_VERSION: v2.15.0
+  IMAGE: ghcr.io/yehorboldarev/thisisyouryear
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          unformatted="$(git ls-files -z '*.go' | xargs -0 gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files need gofmt (run: make fmt):"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum || {
+            echo "::error::go.mod/go.sum are not tidy (run: make tidy)"; exit 1; }
+
+      # `integration` adds the integration tests to the default file set and
+      # `embedui` swaps in the embedded-SPA file: two passes cover every file.
+      - name: go vet
+        run: |
+          go vet -tags=integration ./...
+          go vet -tags=embedui ./...
+
+      - name: golangci-lint (default + integration)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --build-tags=integration
+
+      - name: golangci-lint (embedui)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --build-tags=embedui
+
+      - name: Unit tests
+        run: go test -race ./...
+
+  backend-integration:
+    name: backend-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # testcontainers starts throwaway MongoDB containers on the runner's Docker.
+      - name: Integration tests
+        run: go test -race -tags=integration ./...
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+
+      # schema.d.ts is generated from api/openapi.yaml and committed; fail if
+      # someone changed the contract without regenerating the typed client.
+      - name: OpenAPI types in sync
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/api/schema.d.ts || {
+            echo "::error::web/src/api/schema.d.ts is stale (run: cd web && npm run gen:api)"; exit 1; }
+
+  docker:
+    name: docker
+    needs: [backend, backend-integration, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Publish only from master and version tags — never from PRs or other refs.
+      PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # :sha-<short> on every published build (rollback handle), :latest on
+      # master only, :X.Y.Z and :X.Y on v* tags. latest=false stops a version
+      # tag from also moving :latest.
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # amd64 + arm64 (Raspberry Pi) in one manifest. The Dockerfile
+      # cross-compiles, so no QEMU emulation is needed.
+      - name: Build (and push on master/tags)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

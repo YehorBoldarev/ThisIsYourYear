@@ -1,39 +1,57 @@
-# golangci-lint configuration.
+# golangci-lint configuration (v2 format).
 # A sensible, non-noisy set focused on correctness, simplicity, and security.
+#
+# The pinned linter version lives in the Makefile (GOLANGCI_LINT_VERSION) and in
+# .github/workflows/ci.yml; bump both together.
+#
+# No exclusion presets are enabled: the codebase is clean without them, so every
+# rule below (including revive's doc-comment check on exported identifiers) is
+# actually enforced. Deliberate exceptions are made inline with a
+# `//nolint:<linter> // reason` comment, or listed under exclusions.rules.
+version: "2"
 
 run:
-  timeout: 5m
   tests: true
 
 linters:
-  disable-all: true
+  default: none
   enable:
-    - govet
-    - staticcheck
     - errcheck
-    - ineffassign
-    - revive
-    - gofmt
-    - goimports
-    - misspell
     - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck # in v2 this also covers the old gosimple and stylecheck
     - unconvert
     - unparam
-
-linters-settings:
-  goimports:
-    local-prefixes: kibou/thisisyouryear
-  revive:
+  settings:
+    revive:
+      rules:
+        # Exported identifiers need doc comments.
+        - name: exported
+          disabled: false
+  exclusions:
+    generated: lax
     rules:
-      - name: exported
-        disabled: false
+      # Test helpers commonly ignore returned errors deliberately, and tests use
+      # fixed credentials and paths that gosec would flag.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
 
 issues:
-  exclude-rules:
-    # Test helpers commonly ignore returned errors deliberately.
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
   max-issues-per-linter: 0
   max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - kibou/thisisyouryear
+  exclusions:
+    generated: lax
