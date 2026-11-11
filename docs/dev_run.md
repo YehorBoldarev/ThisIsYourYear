@@ -423,12 +423,28 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
 
 ### 7.1 One-time GitHub settings (after the first green run)
 
-1. **Make the image public.** On GitHub, open your profile, then *Packages* →
-   *thisisyouryear* → *Package settings* → *Change visibility* → **Public**. Hosts (the
-   Raspberry Pi) can then pull it without credentials.
-2. **Protect `master`.** Go to *Settings* → *Branches* (or *Rules* → *Rulesets*), add a rule for
-   `master` and require the status checks **`backend`**, **`backend-integration`** and
-   **`frontend`**.
+1. **Image visibility.** The package is already **public**: an anonymous pull works (checked
+   2026-11-11). To check or change it, open
+   *github.com/YehorBoldarev* → *Packages* tab → **thisisyouryear**. The badge next to the name
+   says *Public*/*Private*. *Package settings* (right sidebar) → *Danger Zone* → *Change
+   visibility*.
+   - **Verify from any machine without logging in:**
+     `docker buildx imagetools inspect ghcr.io/yehorboldarev/thisisyouryear:latest`.
+     It lists `linux/amd64` and `linux/arm64`.
+2. **Protect `master` with a ruleset.** Go to *Settings* → *Rules* → *Rulesets* → *New ruleset* →
+   *New branch ruleset*:
+   - Name `master`; *Enforcement status* **Active**.
+   - *Targets* → *Add target* → **Include default branch**.
+   - Keep **Restrict deletions** and **Block force pushes** (on by default).
+   - **Require a pull request before merging**, with *Required approvals* **0**. You're the
+     only developer, and GitHub won't let you approve your own PR.
+   - **Require status checks to pass** → *Add checks* → **`backend`**,
+     **`backend-integration`**, **`frontend`**, **`docker`**. `docker` makes sure a PR can't
+     break the image build; checks are listed once they've run in the last week.
+   - *Create*.
+   - **Effect:** `git push origin master` is now **rejected**. Work on a branch, push it, open a
+     PR, and merge when the four checks are green; the merge then publishes `:latest`. To keep
+     an emergency direct-push escape hatch, add *Repository admin* to the ruleset's *Bypass list*.
 
 ---
 
@@ -468,7 +484,8 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
       JSON 404);
     - `docker buildx` for amd64 + arm64 (the arm64 binary is a static aarch64 ELF);
     - both compose builds.
-  - **Pending:** the first real Actions run needs a push.
+  - **Verified on GitHub (2026-11-11):** all four jobs green on the first run, and the published
+    image is public and multi-arch.
 
 - **Fix — Mobile "New ＋" tab did nothing:** the tab bar lives in the app shell, but the topic
   popups were owned by a `ModalHost` inside the Dashboard page, so the shell passed it a no-op.
