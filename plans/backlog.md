@@ -7,6 +7,8 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
 
 ### Year rollover & multi-year history
 > Added 2026-11-07. **Time-sensitive:** affects every user on 1 January 2027.
+> **Now planned (2026-11-11):** [`frontend/10-preparation-stage.md`](frontend/10-preparation-stage.md)
+> — a pre-launch "preparation stage" for 2027 plus the year switcher.
 
 - **Problem.** The dashboard, chapter list and Wins page only show the current year, and the UI has
   no year switcher. `GET /topics` accepts `?year=`, but `GET /dashboard` doesn't. When the year
@@ -37,6 +39,32 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
 ### Deep links to topic popups
 - Popups are local state, so a topic detail can't be linked or restored on reload (URL sync
   deferred in `frontend/04-topics-goals.md` D3).
+
+### Self-service password change
+- Deferred from C3 (D5). Today the operator resets a password with `api admin reset-password`, and
+  the person keeps the temporary password. Needs `POST /me/password` (current + new) and a small
+  account-settings form.
+
+### Admin command to delete an account
+- `docs/operations.md` §7.5 removes an account with a manual `mongosh` script; an
+  `api admin delete-user --email X` command (with confirmation) would be safer.
+
+### Uptime monitoring
+- The site has a permanent address now (Tailscale Funnel), so an external check of
+  `https://<machine>.<tailnet>.ts.net/healthz` (a free uptime service, or a phone notification)
+  would tell you about an outage before family does.
+
+### Off-site backups
+- Backups go to the Pi (or a USB drive) and are copied to a computer by hand monthly. An automatic
+  encrypted copy elsewhere (e.g. `rclone` to cloud storage) would remove the manual step.
+
+### Custom domain
+- Funnel only serves `*.ts.net`. For your own domain, use a Cloudflare Tunnel (the first C3 draft)
+  in front of the same kit. The client-IP mechanism is header-configurable
+  (`CLIENT_IP_HEADER=CF-Connecting-IP`).
+
+### Monthly themes
+- Planned for discussion: [`frontend/11-monthly-themes.md`](frontend/11-monthly-themes.md).
 
 ### End-to-end tests (optional)
 - A few Playwright golden-path flows (sign up → create a goal → complete it → celebration),

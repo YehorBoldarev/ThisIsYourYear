@@ -6,6 +6,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -22,6 +23,9 @@ const (
 	// EnvProduction enforces production-only checks (e.g. a real JWT_SECRET) and ignores .env.
 	EnvProduction Environment = "production"
 )
+
+// minInviteCodeLen is the shortest accepted REGISTRATION_INVITE_CODE.
+const minInviteCodeLen = 8
 
 // devJWTSecret is the throwaway signing secret used when none is configured. It
 // exists only so the service runs out-of-the-box in development; using it in
@@ -66,6 +70,18 @@ type Config struct {
 	RateLimitAuthRequests int           `env:"RATE_LIMIT_AUTH_REQUESTS" envDefault:"20"`
 	RateLimitAuthWindow   time.Duration `env:"RATE_LIMIT_AUTH_WINDOW" envDefault:"1m"`
 
+	// Client IP behind a reverse proxy. Requests arriving from an address in
+	// TrustedProxies (IPs or CIDRs) take the client IP from ClientIPHeader, which
+	// must hold exactly one IP (the proxy overwrites it; chains are rejected).
+	// Empty TrustedProxies means forwarding headers are never trusted and the
+	// client IP is the direct peer address.
+	TrustedProxies []string `env:"TRUSTED_PROXIES" envSeparator:","`
+	ClientIPHeader string   `env:"CLIENT_IP_HEADER" envDefault:"X-Forwarded-For"`
+
+	// RegistrationInviteCode, when set, makes sign-up invite-only: registration
+	// must present this code. Empty means open registration.
+	RegistrationInviteCode string `env:"REGISTRATION_INVITE_CODE"`
+
 	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -97,12 +113,46 @@ func Load() (Config, error) {
 	// A comma-separated env var can yield empty entries (e.g. an unset or
 	// trailing-comma value); drop them so validation and CORS see a clean list.
 	cfg.CORSAllowedOrigins = cleanOrigins(cfg.CORSAllowedOrigins)
+	cfg.TrustedProxies = cleanOrigins(cfg.TrustedProxies)
+	cfg.ClientIPHeader = strings.TrimSpace(cfg.ClientIPHeader)
+	cfg.RegistrationInviteCode = strings.TrimSpace(cfg.RegistrationInviteCode)
 
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
 
 	return cfg, nil
+}
+
+// TrustedProxyPrefixes returns TRUSTED_PROXIES as network prefixes (a bare IP
+// becomes a single-address prefix). Load has already validated every entry, so
+// unparsable entries cannot occur on a loaded Config and are skipped.
+func (c Config) TrustedProxyPrefixes() []netip.Prefix {
+	prefixes := make([]netip.Prefix, 0, len(c.TrustedProxies))
+	for _, entry := range c.TrustedProxies {
+		if p, err := parsePrefix(entry); err == nil {
+			prefixes = append(prefixes, p)
+		}
+	}
+	return prefixes
+}
+
+// parsePrefix accepts either a CIDR ("172.30.42.0/24") or a bare IP
+// ("172.30.42.1"), returning the equivalent prefix.
+func parsePrefix(entry string) (netip.Prefix, error) {
+	if strings.Contains(entry, "/") {
+		p, err := netip.ParsePrefix(entry)
+		if err != nil {
+			return netip.Prefix{}, err
+		}
+		return p.Masked(), nil
+	}
+	addr, err := netip.ParseAddr(entry)
+	if err != nil {
+		return netip.Prefix{}, err
+	}
+	addr = addr.Unmap()
+	return netip.PrefixFrom(addr, addr.BitLen()), nil
 }
 
 // cleanOrigins trims whitespace and removes empty entries from a list of origins.
@@ -144,6 +194,15 @@ func (c Config) validate() error {
 		return err
 	}
 
+	for _, entry := range c.TrustedProxies {
+		if _, err := parsePrefix(entry); err != nil {
+			return fmt.Errorf("invalid TRUSTED_PROXIES entry %q: must be an IP or CIDR", entry)
+		}
+	}
+	if len(c.TrustedProxies) > 0 && c.ClientIPHeader == "" {
+		return fmt.Errorf("CLIENT_IP_HEADER must be set when TRUSTED_PROXIES is set")
+	}
+
 	// Rate limiting: a negative count is nonsensical; 0 is the explicit "off"
 	// switch. A positive count needs a positive window to divide requests into.
 	if c.RateLimitAuthRequests < 0 {
@@ -179,6 +238,11 @@ func (c Config) validateAuth() error {
 	// bcrypt accepts costs in [4, 31]; below 10 is too weak for passwords.
 	if c.BcryptCost < 10 || c.BcryptCost > 31 {
 		return fmt.Errorf("invalid BCRYPT_COST %d: must be in range 10-31", c.BcryptCost)
+	}
+
+	// An invite code is the only gate on sign-up; a short one is guessable.
+	if c.RegistrationInviteCode != "" && len(c.RegistrationInviteCode) < minInviteCodeLen {
+		return fmt.Errorf("REGISTRATION_INVITE_CODE must be at least %d characters (or empty for open registration)", minInviteCodeLen)
 	}
 
 	// The refresh cookie is sent with credentials, so a wildcard CORS origin is

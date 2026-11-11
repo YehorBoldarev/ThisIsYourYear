@@ -31,10 +31,34 @@ tags:
     description: Operational endpoints (health, readiness, API contract).
 
 paths:
+  /api/v1/auth/registration:
+    get:
+      tags: [auth]
+      summary: Sign-up policy
+      description: |
+        Tells the sign-up page whether registration is invite-only, so it can show
+        the invite-code field. Reveals nothing about the code itself.
+      operationId: getRegistrationInfo
+      security: []
+      responses:
+        "200":
+          description: The current sign-up policy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationInfo"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/v1/auth/register:
     post:
       tags: [auth]
       summary: Create an account
+      description: |
+        When the server is invite-only (`REGISTRATION_INVITE_CODE` set; see
+        `GET /api/v1/auth/registration`), `inviteCode` must match. A missing code is
+        a 422 with `fields.inviteCode: "is required"`, a wrong one
+        `fields.inviteCode: "is not valid"`.
       operationId: register
       security: []
       requestBody:
@@ -513,6 +537,18 @@ components:
           type: string
           minLength: 8
           maxLength: 72
+        inviteCode:
+          type: string
+          maxLength: 200
+          description: Required only when registration is invite-only; ignored otherwise.
+
+    RegistrationInfo:
+      type: object
+      required: [inviteRequired]
+      properties:
+        inviteRequired:
+          type: boolean
+          description: True when sign-up needs an invite code.
 
     LoginRequest:
       type: object

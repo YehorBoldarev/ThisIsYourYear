@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"kibou/thisisyouryear/internal/domain"
 	"kibou/thisisyouryear/internal/platform/mongo"
@@ -87,4 +88,24 @@ func (r *UserRepository) ByID(ctx context.Context, id string) (*domain.User, err
 		return nil, err
 	}
 	return doc.toDomain(), nil
+}
+
+// SetPasswordHash replaces a user's password hash (admin password reset), or
+// returns domain.ErrNotFound for an unknown id.
+func (r *UserRepository) SetPasswordHash(ctx context.Context, id, passwordHash string) error {
+	return r.repo.Update(ctx, id, bson.M{"passwordHash": passwordHash})
+}
+
+// List returns every user, oldest first. It is deliberately not scoped by user:
+// it serves only the operator's `admin list-users` command, never an HTTP route.
+func (r *UserRepository) List(ctx context.Context) ([]*domain.User, error) {
+	docs, err := r.repo.List(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	users := make([]*domain.User, 0, len(docs))
+	for i := range docs {
+		users = append(users, docs[i].toDomain())
+	}
+	return users, nil
 }

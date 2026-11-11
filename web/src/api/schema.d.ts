@@ -4,6 +4,27 @@
  */
 
 export interface paths {
+    "/api/v1/auth/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign-up policy
+         * @description Tells the sign-up page whether registration is invite-only, so it can show
+         *     the invite-code field. Reveals nothing about the code itself.
+         */
+        get: operations["getRegistrationInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -13,7 +34,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create an account */
+        /**
+         * Create an account
+         * @description When the server is invite-only (`REGISTRATION_INVITE_CODE` set; see
+         *     `GET /api/v1/auth/registration`), `inviteCode` must match. A missing code is
+         *     a 422 with `fields.inviteCode: "is required"`, a wrong one
+         *     `fields.inviteCode: "is not valid"`.
+         */
         post: operations["register"];
         delete?: never;
         options?: never;
@@ -300,6 +327,12 @@ export interface components {
             email: string;
             displayName: string;
             password: string;
+            /** @description Required only when registration is invite-only; ignored otherwise. */
+            inviteCode?: string;
+        };
+        RegistrationInfo: {
+            /** @description True when sign-up needs an invite code. */
+            inviteRequired: boolean;
         };
         LoginRequest: {
             /** Format: email */
@@ -563,6 +596,27 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getRegistrationInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current sign-up policy. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationInfo"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+        };
+    };
     register: {
         parameters: {
             query?: never;

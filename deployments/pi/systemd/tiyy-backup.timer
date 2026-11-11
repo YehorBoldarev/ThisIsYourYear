@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily ThisIsYourYear database backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# If the Pi was off at 03:30, run once it's back.
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

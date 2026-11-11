@@ -13,6 +13,15 @@ type RegisterRequest struct {
 	DisplayName string `json:"displayName" validate:"required,max=100"`
 	// bcrypt hashes at most 72 bytes, so the password is capped there.
 	Password string `json:"password" validate:"required,min=8,max=72"`
+	// InviteCode is required (and checked by the service) only when sign-up is
+	// invite-only; it is ignored otherwise.
+	InviteCode string `json:"inviteCode,omitempty" validate:"max=200"`
+}
+
+// RegistrationInfoResponse tells the sign-up page whether to ask for an invite
+// code (GET /auth/registration).
+type RegistrationInfoResponse struct {
+	InviteRequired bool `json:"inviteRequired"`
 }
 
 // LoginRequest is the body of POST /auth/login.

@@ -28,20 +28,34 @@ const refreshCookieName = "refresh_token"
 // over an httptest server, with a cookie-jar client so the refresh cookie flows
 // exactly as a browser would carry it.
 type testApp struct {
-	server *httptest.Server
-	client *http.Client
+	server   *httptest.Server
+	client   *http.Client
+	sessions *repository.SessionRepository
+}
+
+// appOptions tunes the wired service for a test. The zero value is the default
+// flow-test setup: no rate limiting, open registration, no trusted proxies.
+type appOptions struct {
+	RateLimit  RateLimitConfig
+	InviteCode string
+	ClientIP   ClientIPConfig
 }
 
 // startApp starts the full service with auth rate limiting disabled, which is
 // what every flow test wants (they register/login many users in quick
 // succession). Tests that need throttling use startAppWithRateLimit.
 func startApp(t *testing.T) *testApp {
-	return startAppWithRateLimit(t, RateLimitConfig{})
+	return startAppWith(t, appOptions{})
 }
 
 // startAppWithRateLimit starts the full service with the given auth rate-limit
 // configuration (a zero value disables limiting).
 func startAppWithRateLimit(t *testing.T, rl RateLimitConfig) *testApp {
+	return startAppWith(t, appOptions{RateLimit: rl})
+}
+
+// startAppWith starts the full service with the given options.
+func startAppWith(t *testing.T, opts appOptions) *testApp {
 	t.Helper()
 	ctx := context.Background()
 
@@ -69,7 +83,11 @@ func startAppWithRateLimit(t *testing.T, rl RateLimitConfig) *testApp {
 		userRepo, sessionRepo,
 		auth.NewPasswordHasher(10), // low cost keeps tests fast
 		tokens,
-		service.AuthConfig{RefreshTTLRemember: 744 * time.Hour, RefreshTTLDefault: 24 * time.Hour},
+		service.AuthConfig{
+			RefreshTTLRemember: 744 * time.Hour,
+			RefreshTTLDefault:  24 * time.Hour,
+			InviteCode:         opts.InviteCode,
+		},
 	)
 
 	topicService := service.NewTopicService(topicRepo, goalRepo)
@@ -82,7 +100,8 @@ func startAppWithRateLimit(t *testing.T, rl RateLimitConfig) *testApp {
 		GoalService:      service.NewGoalService(goalRepo, topicRepo),
 		DashboardService: service.NewDashboardService(topicService, time.Now),
 		TokenVerifier:    tokens,
-		RateLimit:        rl,
+		RateLimit:        opts.RateLimit,
+		ClientIP:         opts.ClientIP,
 		// Secure=false so the cookie jar sends the refresh cookie over the
 		// httptest http:// server (a Secure cookie is withheld on plain HTTP).
 		RefreshCookie: RefreshCookieConfig{Name: refreshCookieName, Path: "/api/v1/auth", Secure: false},
@@ -94,7 +113,7 @@ func startAppWithRateLimit(t *testing.T, rl RateLimitConfig) *testApp {
 	jar, err := cookiejar.New(nil)
 	require.NoError(t, err)
 
-	return &testApp{server: srv, client: &http.Client{Jar: jar}}
+	return &testApp{server: srv, client: &http.Client{Jar: jar}, sessions: sessionRepo}
 }
 
 // doJSON performs a request through the jar-backed client, marshaling body (if

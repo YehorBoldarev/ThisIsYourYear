@@ -25,6 +25,21 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
+// FieldError is a validation failure tied to one named input field, raised by a
+// business rule (as opposed to request-shape validation in the transport layer).
+// It unwraps to ErrValidation, and the HTTP adapter renders Field/Message in the
+// error envelope's per-field map so a form can show it next to the right input.
+type FieldError struct {
+	Field   string
+	Message string
+}
+
+// Error implements error.
+func (e *FieldError) Error() string { return e.Field + ": " + e.Message }
+
+// Unwrap makes errors.Is(err, ErrValidation) true for a FieldError.
+func (e *FieldError) Unwrap() error { return ErrValidation }
+
 // IsNotFound reports whether err is or wraps ErrNotFound.
 func IsNotFound(err error) bool { return errors.Is(err, ErrNotFound) }
 

@@ -3,10 +3,11 @@
 How to run the backend on your machine, exercise it, and shut it down cleanly.
 
 > **Keep this current:** this document is updated at the end of every implementation
-> step. It reflects the app **as of Step C2 (CI/CD pipeline)**.
+> step. It reflects the app **as of Step C3 (self-hosting on a Raspberry Pi)**.
 > Backend is complete through Step 9; the frontend (Phase B) lives in `web/` — see
 > [§5 Frontend](#5-frontend-phase-b) and [`web/README.md`](../web/README.md). Production
 > serving is §6 and continuous integration is [§7](#7-continuous-integration-github-actions).
+> Running the production site on the Pi is in the admin handbook, [`operations.md`](operations.md).
 
 ---
 
@@ -78,6 +79,9 @@ for a local run. Common overrides:
 | `CORS_ALLOWED_ORIGINS` | empty | comma-separated SPA origins (no `*`, credentials are used) |
 | `RATE_LIMIT_AUTH_REQUESTS` | `20` | max auth requests per window per client IP; **`0` disables** rate limiting |
 | `RATE_LIMIT_AUTH_WINDOW` | `1m` | the rate-limit window duration |
+| `TRUSTED_PROXIES` | empty | comma-separated IPs/CIDRs of reverse proxies allowed to state the client IP; empty = never trust forwarding headers |
+| `CLIENT_IP_HEADER` | `X-Forwarded-For` | header read from a trusted proxy; must hold **one** IP (chains are ignored) |
+| `REGISTRATION_INVITE_CODE` | empty | non-empty (≥ 8 chars) makes sign-up invite-only; empty = open registration |
 
 Example with overrides:
 
@@ -449,6 +453,27 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
 ---
 
 ## Changelog
+
+- **Step C3 — Self-hosting on a Raspberry Pi (Tailscale Funnel):**
+  - **Real visitor IP.** New `clientIPMiddleware`: `TRUSTED_PROXIES` + `CLIENT_IP_HEADER`
+    (single IP only). The rate limiter, session IP and access log (`client_ip` + `remote_ip`) all
+    use the resolved IP. Empty config = previous behaviour.
+  - **Invite-only sign-up.** `REGISTRATION_INVITE_CODE` (≥ 8 chars; empty = open), an optional
+    `inviteCode` on `POST /auth/register` (422 `fields.inviteCode`: `is required` / `is not valid`,
+    constant-time compare), and new `GET /auth/registration` → `{inviteRequired}`. The sign-up page
+    shows an "Invite code" field when needed, prefilled from `/register?invite=…`.
+  - **Operator commands** in the binary: `api healthcheck` (checks `/readyz`) and
+    `api admin list-users|reset-password --email X` (temporary password, signs the person out
+    everywhere).
+  - **Pi kit** `deployments/pi/`: compose file, `.env.example`, `backup.sh`, `restore.sh`
+    (`--drill`), `update.sh` (backup → update → automatic rollback), and systemd timers.
+  - **Admin handbook** `docs/operations.md`.
+  - **Verified:**
+    - Go gates, unit and integration tests;
+    - web gates (182 tests);
+    - shellcheck and `systemd-analyze`;
+    - a full local rehearsal of the kit, including a broken release that rolled back
+      automatically.
 
 - **Step C2 — CI/CD pipeline (GitHub Actions):**
   - **Workflow:** `.github/workflows/ci.yml` with four jobs.

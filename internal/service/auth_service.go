@@ -6,6 +6,8 @@ package service
 
 import (
 	"context"
+	"crypto/subtle"
+	"strings"
 	"time"
 
 	"kibou/thisisyouryear/internal/auth"
@@ -38,10 +40,13 @@ type AccessTokenIssuer interface {
 	Issue(userID string) (token string, expiresAt time.Time, err error)
 }
 
-// AuthConfig carries the refresh-session lifetimes.
+// AuthConfig carries the refresh-session lifetimes and the sign-up policy.
 type AuthConfig struct {
 	RefreshTTLRemember time.Duration
 	RefreshTTLDefault  time.Duration
+	// InviteCode, when non-empty, makes registration invite-only: Register
+	// accepts only this code. Empty means open registration.
+	InviteCode string
 }
 
 // Credentials is the result of a successful login or refresh: the access token
@@ -78,9 +83,17 @@ func NewAuthService(users UserRepository, sessions SessionRepository, hasher Pas
 	}
 }
 
-// Register creates a new account with a bcrypt-hashed password. A duplicate
-// email surfaces as domain.ErrConflict.
-func (s *AuthService) Register(ctx context.Context, email, displayName, password string) (*domain.User, error) {
+// InviteRequired reports whether registration needs an invite code.
+func (s *AuthService) InviteRequired() bool { return s.cfg.InviteCode != "" }
+
+// Register creates a new account with a bcrypt-hashed password. When sign-up is
+// invite-only, a missing or wrong inviteCode is a *domain.FieldError on
+// "inviteCode" (checked first, before any hashing). A duplicate email surfaces
+// as domain.ErrConflict.
+func (s *AuthService) Register(ctx context.Context, email, displayName, password, inviteCode string) (*domain.User, error) {
+	if err := s.checkInvite(inviteCode); err != nil {
+		return nil, err
+	}
 	hash, err := s.hasher.Hash(password)
 	if err != nil {
 		return nil, err
@@ -93,6 +106,23 @@ func (s *AuthService) Register(ctx context.Context, email, displayName, password
 		return nil, err
 	}
 	return user, nil
+}
+
+// checkInvite enforces invite-only registration. The comparison is constant
+// time so response timing reveals nothing about the code; guessing is further
+// throttled by the per-IP auth rate limit.
+func (s *AuthService) checkInvite(inviteCode string) error {
+	if !s.InviteRequired() {
+		return nil
+	}
+	provided := strings.TrimSpace(inviteCode)
+	if provided == "" {
+		return &domain.FieldError{Field: "inviteCode", Message: "is required"}
+	}
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(s.cfg.InviteCode)) != 1 {
+		return &domain.FieldError{Field: "inviteCode", Message: "is not valid"}
+	}
+	return nil
 }
 
 // Login authenticates a user and issues a fresh session. Unknown email and wrong

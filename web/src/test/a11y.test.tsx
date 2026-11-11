@@ -8,6 +8,7 @@ import { dashboardResponse, goalResponse, server, tokenResponse, topicResponse }
 import { AuthProvider } from '../auth/AuthProvider'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import { Login } from '../routes/Login'
+import { Register } from '../routes/Register'
 import { Dashboard } from '../features/dashboard/Dashboard'
 import { ModalHost } from '../features/topics/ModalHost'
 import { AchievementsPage } from '../features/achievements/AchievementsPage'
@@ -46,6 +47,25 @@ describe('accessibility (axe)', () => {
       </MemoryRouter>,
     )
     expect(await screen.findByRole('button', { name: /Sign in/i })).toBeInTheDocument()
+    await expectNoViolations(container)
+  })
+
+  it('invite-only sign-up screen has no violations', async () => {
+    server.use(
+      http.get('/api/v1/auth/registration', () => HttpResponse.json({ inviteRequired: true })),
+    )
+    const { container } = render(
+      <MemoryRouter initialEntries={['/register?invite=sunflower-2027']}>
+        <QueryClientProvider client={client()}>
+          <AuthProvider>
+            <ThemeProvider>
+              <Register />
+            </ThemeProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByLabelText('Invite code')).toHaveValue('sunflower-2027')
     await expectNoViolations(container)
   })
 

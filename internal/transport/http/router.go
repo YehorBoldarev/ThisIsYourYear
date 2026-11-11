@@ -37,6 +37,10 @@ type RouterDeps struct {
 	// RateLimit.AuthRequests is 0, no auth rate limiting is installed.
 	RateLimit RateLimitConfig
 
+	// ClientIP says which reverse proxies may state the client IP. The zero
+	// value trusts none: the client IP is always the direct peer address.
+	ClientIP ClientIPConfig
+
 	// SPAFS, when non-nil, is the built single-page app served for any route the
 	// API/ops groups don't match (with a client-side-routing fallback to
 	// index.html). Nil ⇒ API-only: unmatched routes get the default 404.
@@ -62,10 +66,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	//
 	// We deliberately do not use middleware.RealIP: it trusts client-supplied
 	// forwarding headers (X-Forwarded-For / X-Real-IP) unconditionally and is
-	// vulnerable to IP spoofing. If the service is later deployed behind a
-	// trusted proxy, we will derive the client IP from a vetted, allow-listed
-	// source at that point.
+	// vulnerable to IP spoofing. clientIPMiddleware instead honours a single-IP
+	// header only from allow-listed proxy addresses (deps.ClientIP), and runs
+	// before the logger and rate limiter so they all see the same client IP.
 	r.Use(middleware.RequestID)
+	r.Use(clientIPMiddleware(deps.ClientIP))
 	r.Use(requestLogger(deps.Logger))
 	r.Use(middleware.Recoverer)
 	// CORS must run before the request timeout and route handlers so browser
@@ -98,6 +103,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 				limiter := newRateLimiter(deps.RateLimit.AuthRequests, deps.RateLimit.AuthWindow, nil)
 				a.Use(limiter.middleware)
 			}
+			a.Get("/registration", authHandler.RegistrationInfo)
 			a.Post("/register", authHandler.Register)
 			a.Post("/login", authHandler.Login)
 			a.Post("/refresh", authHandler.Refresh)

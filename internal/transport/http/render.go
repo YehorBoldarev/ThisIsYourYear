@@ -50,9 +50,13 @@ func respondError(w http.ResponseWriter, logger *slog.Logger, r *http.Request, e
 	var fields map[string]string
 
 	var ve *ValidationError
+	var fe *domain.FieldError
 	switch {
 	case errors.As(err, &ve):
 		status, code, message, fields = http.StatusUnprocessableEntity, "validation_error", ve.Error(), ve.Fields
+	case errors.As(err, &fe):
+		status, code, message = http.StatusUnprocessableEntity, "validation_error", "one or more fields are invalid"
+		fields = map[string]string{fe.Field: fe.Message}
 	case domain.IsValidation(err):
 		status, code, message = http.StatusUnprocessableEntity, "validation_error", "validation failed"
 	case domain.IsInvalidCredentials(err), domain.IsUnauthenticated(err):

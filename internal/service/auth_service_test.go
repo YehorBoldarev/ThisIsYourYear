@@ -130,7 +130,7 @@ func newTestService() (*AuthService, *memSessionRepo) {
 
 func TestRegister_Success(t *testing.T) {
 	svc, _ := newTestService()
-	user, err := svc.Register(context.Background(), "Alice@Example.com", "Alice", "password123")
+	user, err := svc.Register(context.Background(), "Alice@Example.com", "Alice", "password123", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, user.ID)
 	require.Equal(t, "alice@example.com", user.Email)
@@ -140,17 +140,17 @@ func TestRegister_Success(t *testing.T) {
 func TestRegister_DuplicateEmail(t *testing.T) {
 	svc, _ := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 
-	_, err = svc.Register(ctx, "A@B.com", "Alice2", "password456")
+	_, err = svc.Register(ctx, "A@B.com", "Alice2", "password456", "")
 	require.ErrorIs(t, err, domain.ErrConflict)
 }
 
 func TestLogin_Success(t *testing.T) {
 	svc, sessions := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 
 	creds, err := svc.Login(ctx, "a@b.com", "password123", true, "ua", "ip")
@@ -166,7 +166,7 @@ func TestLogin_Success(t *testing.T) {
 func TestLogin_DefaultTTLWithoutRemember(t *testing.T) {
 	svc, _ := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 
 	creds, err := svc.Login(ctx, "a@b.com", "password123", false, "ua", "ip")
@@ -177,7 +177,7 @@ func TestLogin_DefaultTTLWithoutRemember(t *testing.T) {
 func TestLogin_WrongPassword(t *testing.T) {
 	svc, _ := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 
 	_, err = svc.Login(ctx, "a@b.com", "wrong", false, "ua", "ip")
@@ -194,7 +194,7 @@ func TestLogin_UnknownEmail(t *testing.T) {
 func TestRefresh_RotatesToken(t *testing.T) {
 	svc, _ := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 	first, err := svc.Login(ctx, "a@b.com", "password123", true, "ua", "ip")
 	require.NoError(t, err)
@@ -214,7 +214,7 @@ func TestRefresh_RotatesToken(t *testing.T) {
 func TestRefresh_ReuseRevokesLineage(t *testing.T) {
 	svc, _ := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 	first, err := svc.Login(ctx, "a@b.com", "password123", true, "ua", "ip")
 	require.NoError(t, err)
@@ -240,7 +240,7 @@ func TestRefresh_Empty(t *testing.T) {
 func TestLogout_RevokesSession(t *testing.T) {
 	svc, _ := newTestService()
 	ctx := context.Background()
-	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123")
+	_, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "")
 	require.NoError(t, err)
 	creds, err := svc.Login(ctx, "a@b.com", "password123", true, "ua", "ip")
 	require.NoError(t, err)
@@ -255,4 +255,48 @@ func TestLogout_UnknownTokenIsNoop(t *testing.T) {
 	svc, _ := newTestService()
 	require.NoError(t, svc.Logout(context.Background(), "does-not-exist"))
 	require.NoError(t, svc.Logout(context.Background(), ""))
+}
+
+func newInviteOnlyService(code string) *AuthService {
+	return NewAuthService(newMemUserRepo(), newMemSessionRepo(), fakeHasher{}, &fakeTokens{}, AuthConfig{
+		RefreshTTLRemember: time.Hour,
+		RefreshTTLDefault:  time.Minute,
+		InviteCode:         code,
+	})
+}
+
+func TestRegister_OpenWhenNoInviteCode(t *testing.T) {
+	svc, _ := newTestService()
+	require.False(t, svc.InviteRequired())
+	_, err := svc.Register(context.Background(), "a@b.com", "Alice", "password123", "anything")
+	require.NoError(t, err, "an unexpected code is ignored when sign-up is open")
+}
+
+func TestRegister_InviteOnly(t *testing.T) {
+	svc := newInviteOnlyService("sunflower-2027")
+	require.True(t, svc.InviteRequired())
+	ctx := context.Background()
+
+	cases := map[string]struct {
+		code    string
+		wantMsg string
+	}{
+		"missing": {"", "is required"},
+		"blank":   {"   ", "is required"},
+		"wrong":   {"sunflower-2026", "is not valid"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := svc.Register(ctx, name+"@b.com", "Alice", "password123", tc.code)
+			var fe *domain.FieldError
+			require.ErrorAs(t, err, &fe)
+			require.Equal(t, "inviteCode", fe.Field)
+			require.Equal(t, tc.wantMsg, fe.Message)
+			require.True(t, domain.IsValidation(err))
+		})
+	}
+
+	user, err := svc.Register(ctx, "a@b.com", "Alice", "password123", "  sunflower-2027 ")
+	require.NoError(t, err, "the right code (surrounding spaces trimmed) is accepted")
+	require.Equal(t, "a@b.com", user.Email)
 }

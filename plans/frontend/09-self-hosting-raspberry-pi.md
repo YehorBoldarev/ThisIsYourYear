@@ -1,6 +1,7 @@
 # Step C3 — Self-hosting on a Raspberry Pi 5 (Tailscale Funnel)
 
-> **Status:** Revised draft for approval (2026-11-11)
+> **Status:** Approved (2026-11-11: D1a **Funnel**, condition verified; D8 **not enabled**, guide in
+> the handbook) and implemented (2026-11-11). See §9.
 > **Parent:** Phase C (production). Follows [`08-ci-cd-pipeline.md`](08-ci-cd-pipeline.md) (C2).
 > **Depends on:** C2: done and green. The multi-arch image `ghcr.io/yehorboldarev/thisisyouryear` is
 > published and publicly pullable (`linux/amd64` + `linux/arm64`, checked 2026-11-11).
@@ -455,3 +456,57 @@ shares one login rate-limit bucket. So treat it as a **test only**: no real data
   recovery safe. A small UPS is optional.
 - **16 KB page kernel.** Already ruled out: Mongo 7.0.45 passed the smoke test on your Pi. The
   handbook keeps the `kernel=kernel8.img` note in case an OS upgrade changes it.
+
+---
+
+## 9. Implementation notes (2026-11-11)
+
+**Decisions as approved:**
+- **D1a — Funnel (public).** You approved it on one condition: a random visitor must be unable to
+  do anything without signing in. That condition was verified in code:
+  - The SPA's only public routes are `/login` and `/register`; everything else is behind
+    `RequireAuth`.
+  - Every data endpoint is behind the access-token middleware.
+  - The only unauthenticated API surface is `healthz`/`readyz`/`openapi.yaml` and the auth
+    endpoints. Sign-up needs the invite code, and sign-in is bcrypt plus per-visitor rate
+    limiting.
+- **D8 — remote admin not enabled.** `docs/operations.md` §10 documents how to turn it on later
+  (key-only SSH first).
+
+**Differences from the draft, and findings:**
+- **`AdminService`, not `AuthService`, owns the operator commands.** It has its own unscoped port,
+  `AdminUserRepository`, plus `SessionRevoker`. That keeps the user-scoped auth ports untouched and
+  makes the one unscoped port explicit and CLI-only.
+- **The temporary password isn't four words.** It's four groups of four characters from an
+  unambiguous alphabet (`k7pq-m3xd-r9tw-h2nf`, ~79 bits). That needs no embedded wordlist and is
+  still easy to read out.
+- **`api healthcheck` checks `/readyz`, not `/healthz`.** Being "healthy" then also means MongoDB is
+  reachable, which is the right signal for `update.sh`'s rollback decision.
+- **New `domain.FieldError`.** A business rule (the invite check) can now return a per-field 422
+  through the single `respondError` mapping.
+- **Bug found in rehearsal: `update.sh` must tag the rollback image *before* pulling.** With Docker's
+  containerd image store (the default on new installs, including the Pi), an image that loses its
+  last tag is deleted at once. Pulling first left nothing to roll back to. If tagging is impossible
+  (someone pulled by hand), the script now stops without changing anything and says what to do.
+- **Compose project name is `tiyy`.** It doesn't collide with the Windows demo (`thisisyouryear`).
+  The kit passes only the variables the app needs into the container (no `env_file`), and refuses
+  to start without `JWT_SECRET`.
+- **The pre-C3 Funnel test recipe** used the same subnet, so the handbook's install begins by
+  removing it.
+
+**Verification:**
+- **Go:** `make fmt vet lint` (0 issues), `make test`, and new integration tests (invite flow,
+  session IP behind a trusted proxy, spoofed header ignored, `SetPasswordHash`/`List`).
+- **Web:** typecheck, ESLint, Prettier, Vitest (182, incl. invite field + axe), build, `gen:api`.
+- **Kit:**
+  - shellcheck, `docker compose config`, and `systemd-analyze verify`; the only complaint is that
+    `/opt/…` doesn't exist off the Pi;
+  - a **full local rehearsal** with a local registry:
+    - invite-only sign-up;
+    - `client_ip` = forwarded IP via the `127.0.0.1` port, while a container on the network
+      faking the header was recorded as its real address;
+    - `admin list-users`/`reset-password` (old password 401, temporary 200, sessions revoked);
+    - backup rotation, restore drill, live restore;
+    - `update.sh`: no-op, broken release → automatic rollback (exit 1, previous version healthy),
+      retry the next night, fixed release → updated.
+
