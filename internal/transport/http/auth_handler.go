@@ -2,7 +2,6 @@ package http
 
 import (
 	"log/slog"
-	"net"
 	"net/http"
 
 	"kibou/thisisyouryear/internal/service"
@@ -34,12 +33,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.svc.Register(r.Context(), req.Email, req.DisplayName, req.Password)
+	user, err := h.svc.Register(r.Context(), req.Email, req.DisplayName, req.Password, req.InviteCode)
 	if err != nil {
 		respondError(w, h.logger, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, toUserResponse(user))
+}
+
+// RegistrationInfo reports the sign-up policy so the client knows whether to
+// show the invite-code field. It reveals nothing about the code itself.
+func (h *AuthHandler) RegistrationInfo(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, RegistrationInfoResponse{InviteRequired: h.svc.InviteRequired()})
 }
 
 // Login authenticates the user, sets the refresh cookie, and returns an access
@@ -87,15 +92,4 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	h.cookie.clear(w)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// clientIP returns the peer address without the port. We intentionally do not
-// trust forwarding headers (see the RealIP note in router.go); this is the
-// direct connection's address, recorded on the session for auditability.
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }

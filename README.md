@@ -73,6 +73,14 @@ The multi-stage [`Dockerfile`](./Dockerfile) produces the same self-contained im
 `linux/amd64` and `linux/arm64` (e.g. a Raspberry Pi). See
 [`docs/dev_run.md`](./docs/dev_run.md) §6 for details.
 
+### Self-hosting on a Raspberry Pi
+
+The production deployment runs on a Raspberry Pi 5, reachable at a permanent HTTPS address through
+**Tailscale Funnel**, with invite-only sign-up, nightly backups, and nightly updates that roll back
+automatically if a new version isn't healthy. The kit is in
+[`deployments/pi/`](./deployments/pi); the admin handbook (install, maintenance schedule, logs,
+backup/restore, troubleshooting) is [`docs/operations.md`](./docs/operations.md).
+
 ### One-click local demo (non-technical Windows users)
 
 Root-level `START-HERE.txt` and `start/stop/uninstall-website.bat` (backed by
@@ -133,9 +141,9 @@ internal/transport/http      chi router, middleware, handlers, DTOs, server life
 internal/transport/http/webui  embedded SPA assets (embedui build tag)
 web                          React + TypeScript single-page app
 api                          OpenAPI 3.1 contract (embedded and served)
-deployments                  docker-compose files
+deployments                  docker-compose files; deployments/pi = the Raspberry Pi production kit
 .github                      CI workflow + Dependabot (GitHub Actions updates)
-docs                         run/verify guide
+docs                         run/verify guide (dev_run.md) and admin handbook (operations.md)
 plans                        system plan and per-step implementation plans
 ```
 

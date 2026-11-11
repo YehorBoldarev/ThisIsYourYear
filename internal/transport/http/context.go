@@ -6,7 +6,10 @@ import "context"
 // they cannot collide with keys from other packages.
 type contextKey int
 
-const userIDKey contextKey = iota
+const (
+	userIDKey contextKey = iota
+	clientIPKey
+)
 
 // withUserID returns a copy of ctx carrying the authenticated user's id. It is
 // set by the auth middleware after a token is verified.

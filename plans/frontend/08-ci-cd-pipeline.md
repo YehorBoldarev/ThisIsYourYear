@@ -1,6 +1,7 @@
 # Step C2 — CI/CD pipeline (GitHub Actions)
 
-> **Status:** Approved and implemented (2026-11-08); waiting on the first real Actions run. See §8.
+> **Status:** Implemented (2026-11-08) and **verified on GitHub (2026-11-11)**: all four jobs green;
+> `ghcr.io/yehorboldarev/thisisyouryear:latest` is public and multi-arch (amd64 + arm64). See §8.
 > **Parent:** Phase C (production). Follows [`07-production-serving.md`](07-production-serving.md).
 > Followed by [`09-self-hosting-raspberry-pi.md`](09-self-hosting-raspberry-pi.md) (C3).
 > **Builds on:** the full repo — Go backend (Steps 1–9), the SPA (B1–B6), and the
@@ -188,8 +189,9 @@ restarts itself (designed in [`09-self-hosting-raspberry-pi.md`](09-self-hosting
   (anyone's PR could run code on your home network).
 - **What C3 needs from C2:** the multi-arch image (D7) and the package made **public** (§6), so the
   Pi pulls without credentials.
-- **Config stays on the host:** `JWT_SECRET`, the invite code and (later) the tunnel token live in
-  a `.env` on the Pi — never in the repo or the workflow. Rollback = run a previous `:sha-…` tag.
+- **Config stays on the host:** `JWT_SECRET` and the invite code live in a `.env` on the Pi;
+  public access goes through Tailscale Funnel, configured on the Pi itself (C3). Nothing goes in
+  the repo or the workflow. Rollback = run a previous `:sha-…` tag.
 
 ---
 

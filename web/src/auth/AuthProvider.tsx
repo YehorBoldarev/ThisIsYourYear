@@ -20,9 +20,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(
-    async (email: string, displayName: string, password: string) => {
+    async (email: string, displayName: string, password: string, inviteCode?: string) => {
       const { data, error, response } = await client.POST('/api/v1/auth/register', {
-        body: { email, displayName, password },
+        body: { email, displayName, password, ...(inviteCode ? { inviteCode } : {}) },
       })
       if (error || !data) throw ApiError.fromBody(response.status, error)
       // Register returns the user but no token; log in to obtain one.

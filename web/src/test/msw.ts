@@ -78,6 +78,7 @@ export function goalResponse(overrides: Partial<Goal> = {}): Goal {
 // Default handlers assume a signed-out visitor (refresh 401). Tests override
 // with server.use(...) for the flows they exercise.
 export const handlers = [
+  http.get('/api/v1/auth/registration', () => HttpResponse.json({ inviteRequired: false })),
   http.post('/api/v1/auth/refresh', () =>
     HttpResponse.json(errorBody('unauthorized', 'no session'), { status: 401 }),
   ),

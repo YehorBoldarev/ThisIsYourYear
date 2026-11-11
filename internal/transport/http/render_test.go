@@ -62,6 +62,20 @@ func TestRespondError_ValidationCarriesFields(t *testing.T) {
 	require.Equal(t, "is required", body.Error.Fields["email"])
 }
 
+func TestRespondError_DomainFieldErrorCarriesField(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	err := fmt.Errorf("register: %w", &domain.FieldError{Field: "inviteCode", Message: "is not valid"})
+	respondError(rec, nil, req, err)
+
+	var body errorBody
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+	require.Equal(t, "validation_error", body.Error.Code)
+	require.Equal(t, "is not valid", body.Error.Fields["inviteCode"])
+	require.True(t, domain.IsValidation(err))
+}
+
 func TestDecodeJSON_RejectsUnknownFields(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{"nope": 1}`))

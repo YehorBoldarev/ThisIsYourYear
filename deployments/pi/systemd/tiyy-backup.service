@@ -1,0 +1,10 @@
+[Unit]
+Description=ThisIsYourYear database backup (deployments/pi/backup.sh)
+Documentation=file:///opt/thisisyouryear/docs/operations.md
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/thisisyouryear/deployments/pi/backup.sh
+TimeoutStartSec=15min

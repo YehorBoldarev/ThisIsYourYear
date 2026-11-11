@@ -34,6 +34,30 @@ func TestLoad_Defaults(t *testing.T) {
 	// Rate-limit defaults.
 	require.Equal(t, 20, cfg.RateLimitAuthRequests)
 	require.Equal(t, time.Minute, cfg.RateLimitAuthWindow)
+
+	// Proxy trust and invite-only sign-up are off by default.
+	require.Empty(t, cfg.TrustedProxies)
+	require.Empty(t, cfg.TrustedProxyPrefixes())
+	require.Equal(t, "X-Forwarded-For", cfg.ClientIPHeader)
+	require.Empty(t, cfg.RegistrationInviteCode)
+}
+
+func TestLoad_ProxyAndInvite(t *testing.T) {
+	clearKnownEnv(t)
+	t.Setenv("TRUSTED_PROXIES", " 172.30.42.1 , 10.0.0.0/8,")
+	t.Setenv("CLIENT_IP_HEADER", "CF-Connecting-IP")
+	t.Setenv("REGISTRATION_INVITE_CODE", "  sunflower-2027  ")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"172.30.42.1", "10.0.0.0/8"}, cfg.TrustedProxies)
+	prefixes := cfg.TrustedProxyPrefixes()
+	require.Len(t, prefixes, 2)
+	require.Equal(t, "172.30.42.1/32", prefixes[0].String())
+	require.Equal(t, "10.0.0.0/8", prefixes[1].String())
+	require.Equal(t, "CF-Connecting-IP", cfg.ClientIPHeader)
+	require.Equal(t, "sunflower-2027", cfg.RegistrationInviteCode, "invite code is trimmed")
 }
 
 func TestLoad_Overrides(t *testing.T) {
@@ -71,6 +95,9 @@ func TestLoad_InvalidValues(t *testing.T) {
 		"prod default secret":  {"APP_ENV": "production", "JWT_SECRET": "dev-insecure-jwt-secret-change-me"},
 		"wildcard cors origin": {"CORS_ALLOWED_ORIGINS": "*"},
 		"negative rate limit":  {"RATE_LIMIT_AUTH_REQUESTS": "-1"},
+		"bad trusted proxy":    {"TRUSTED_PROXIES": "not-an-ip"},
+		"bad trusted cidr":     {"TRUSTED_PROXIES": "172.30.42.0/99"},
+		"short invite code":    {"REGISTRATION_INVITE_CODE": "abc123"},
 	}
 
 	for name, overrides := range tests {
@@ -143,6 +170,18 @@ func TestValidate(t *testing.T) {
 	enabledOK.RateLimitAuthRequests = 5
 	enabledOK.RateLimitAuthWindow = time.Minute
 	require.NoError(t, enabledOK.validate())
+
+	// Trusting proxies needs a header to read the client IP from.
+	proxyNoHeader := base()
+	proxyNoHeader.TrustedProxies = []string{"172.30.42.1"}
+	require.Error(t, proxyNoHeader.validate())
+	proxyNoHeader.ClientIPHeader = "X-Forwarded-For"
+	require.NoError(t, proxyNoHeader.validate())
+
+	// An 8-character invite code is the minimum.
+	invite := base()
+	invite.RegistrationInviteCode = "12345678"
+	require.NoError(t, invite.validate())
 }
 
 // clearKnownEnv unsets every environment variable the config reads so a test
@@ -158,6 +197,7 @@ func clearKnownEnv(t *testing.T) {
 		"JWT_SECRET", "ACCESS_TOKEN_TTL", "REFRESH_TTL_REMEMBER",
 		"REFRESH_TTL_DEFAULT", "BCRYPT_COST", "COOKIE_DOMAIN", "COOKIE_SECURE",
 		"CORS_ALLOWED_ORIGINS", "RATE_LIMIT_AUTH_REQUESTS", "RATE_LIMIT_AUTH_WINDOW",
+		"TRUSTED_PROXIES", "CLIENT_IP_HEADER", "REGISTRATION_INVITE_CODE",
 	} {
 		original, existed := os.LookupEnv(key)
 		require.NoError(t, os.Unsetenv(key))

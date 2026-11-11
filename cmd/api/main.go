@@ -1,8 +1,9 @@
 // Command api is the entrypoint for the ThisIsYourYear backend service.
 //
-// It loads configuration, builds the logger, connects to MongoDB, constructs the
-// HTTP server, and runs until interrupted, at which point it shuts everything
-// down gracefully.
+// With no arguments it loads configuration, builds the logger, connects to
+// MongoDB, constructs the HTTP server, and runs until interrupted, at which
+// point it shuts everything down gracefully. With arguments it runs an operator
+// command instead (see commands.go): `healthcheck`, or `admin …`.
 package main
 
 import (
@@ -24,6 +25,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		os.Exit(runCommand(os.Args[1:], os.Stdout, os.Stderr))
+	}
 	if err := run(); err != nil {
 		// The logger may not exist yet if configuration failed, so fall back to
 		// the default slog logger for this terminal error.
@@ -78,6 +82,7 @@ func run() error {
 	authService := service.NewAuthService(userRepo, sessionRepo, hasher, tokenIssuer, service.AuthConfig{
 		RefreshTTLRemember: cfg.RefreshTTLRemember,
 		RefreshTTLDefault:  cfg.RefreshTTLDefault,
+		InviteCode:         cfg.RegistrationInviteCode,
 	})
 	userService := service.NewUserService(userRepo)
 	topicService := service.NewTopicService(topicRepo, goalRepo)
@@ -103,6 +108,10 @@ func run() error {
 		RateLimit: transporthttp.RateLimitConfig{
 			AuthRequests: cfg.RateLimitAuthRequests,
 			AuthWindow:   cfg.RateLimitAuthWindow,
+		},
+		ClientIP: transporthttp.ClientIPConfig{
+			TrustedProxies: cfg.TrustedProxyPrefixes(),
+			Header:         cfg.ClientIPHeader,
 		},
 		// Present only in the `-tags embedui` build; nil otherwise (API-only).
 		SPAFS: webui.FS(),

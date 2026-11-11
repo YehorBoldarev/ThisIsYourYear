@@ -1,0 +1,73 @@
+# ThisIsYourYear — production stack for the Raspberry Pi (plan C3).
+#
+# Run everything from this directory (see docs/operations.md):
+#   docker compose up -d
+#
+# Settings come from ./.env (copy .env.example). Public access is NOT handled
+# here: Tailscale Funnel on the Pi itself proxies
+#   https://<machine>.<tailnet>.ts.net  →  http://127.0.0.1:8080
+# so the app is published on loopback only, and MongoDB is never published.
+name: tiyy
+
+services:
+  mongo:
+    image: ${MONGO_IMAGE:-mongo:7.0.45}
+    restart: unless-stopped
+    # Cap MongoDB's cache so it can't take half the Pi's RAM.
+    command: ["--wiredTigerCacheSizeGB", "${MONGO_CACHE_GB:-1}"]
+    volumes:
+      - mongo-data:/data/db
+    networks: [tiyy]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      start_interval: 2s
+
+  api:
+    image: ${APP_IMAGE:-ghcr.io/yehorboldarev/thisisyouryear:latest}
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # Only what the app needs reaches the container (not the whole .env).
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8080"
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DATABASE: thisisyouryear
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 32)}
+      REGISTRATION_INVITE_CODE: ${REGISTRATION_INVITE_CODE:-}
+      COOKIE_SECURE: "true"
+      # Tailscale's requests reach the container from this network's gateway
+      # (a loopback-published port arrives via the bridge gateway). Only that
+      # address may state the visitor's IP; tailscaled overwrites the header.
+      TRUSTED_PROXIES: 172.30.42.1
+      CLIENT_IP_HEADER: X-Forwarded-For
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Loopback only: the LAN and the internet can't bypass Tailscale. (Docker's
+    # published ports skip ufw, so binding to 127.0.0.1 is what keeps this private.)
+    ports:
+      - "127.0.0.1:${PUBLISH_PORT:-8080}:8080"
+    networks: [tiyy]
+    healthcheck:
+      # The distroless image has no curl; the binary checks /readyz itself.
+      test: ["CMD", "/app/api", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
+
+networks:
+  tiyy:
+    # Fixed subnet so the gateway (and thus TRUSTED_PROXIES) never changes.
+    ipam:
+      config:
+        - subnet: 172.30.42.0/24
+          gateway: 172.30.42.1
+
+volumes:
+  mongo-data:

@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { Button, Field, Spinner } from '../components'
 import { useAuth } from '../auth/useAuth'
+import { useRegistrationInfo } from '../auth/useRegistrationInfo'
 import { isApiError, type FieldErrors } from '../api/errors'
 
 export function Register() {
@@ -12,11 +13,20 @@ export function Register() {
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  // An invite link (/register?invite=CODE) prefills the code.
+  const [searchParams] = useSearchParams()
+  const inviteFromLink = searchParams.get('invite')?.trim() ?? ''
+  const [inviteCode, setInviteCode] = useState(inviteFromLink)
+  const { data: registration } = useRegistrationInfo()
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   if (status === 'authenticated') return <Navigate to="/" replace />
+
+  // Show the field when the server is invite-only, when a link supplied a code,
+  // or when the server rejected the code (so its error has somewhere to show).
+  const showInvite = !!registration?.inviteRequired || !!inviteFromLink || !!fieldErrors.inviteCode
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -24,7 +34,7 @@ export function Register() {
     setFormError(null)
     setSubmitting(true)
     try {
-      await register(email, displayName, password)
+      await register(email, displayName, password, showInvite ? inviteCode.trim() : undefined)
       navigate('/', { replace: true })
     } catch (err) {
       if (isApiError(err)) {
@@ -60,6 +70,18 @@ export function Register() {
           >
             {formError}
           </div>
+        )}
+        {showInvite && (
+          <Field
+            id="inviteCode"
+            label="Invite code"
+            value={inviteCode}
+            onChange={setInviteCode}
+            error={fieldErrors.inviteCode}
+            autoComplete="off"
+            placeholder="From your invite link"
+            required
+          />
         )}
         <Field
           id="email"

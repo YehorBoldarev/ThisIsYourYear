@@ -96,6 +96,18 @@ Key cross-cutting conventions (each requires reading several files to see):
 - **Config** (`internal/config`) is 100% env-driven (`caarlos0/env`) with dev-friendly defaults.
   In non-prod a local `.env` is loaded; in prod it's ignored. The insecure default `JWT_SECRET`
   is *rejected* when `APP_ENV=production`.
+- **Client IP is resolved once** by `clientIPMiddleware` (`clientip.go`, first in the chain) and
+  read everywhere via `clientIP(r)` — rate limiter, session IP, access log (`client_ip`). A
+  forwarding header (`CLIENT_IP_HEADER`, single IP only) is honoured **only** from
+  `TRUSTED_PROXIES`; never add `middleware.RealIP`.
+- **Business-rule field errors** use `*domain.FieldError{Field, Message}` (unwraps to
+  `ErrValidation`); `respondError` renders it as a 422 with `fields`. Used by invite-only sign-up
+  (`REGISTRATION_INVITE_CODE` → `AuthService.Register`'s `inviteCode`; `GET /auth/registration`
+  tells the SPA whether to show the field).
+- **Operator commands live in the same binary:** `api healthcheck` (Docker healthcheck, hits
+  `/readyz`) and `api admin list-users|reset-password` (`cmd/api/commands.go` → `AdminService`).
+  No arguments = the server. `AdminUserRepository` is the one port **not** scoped by user — it is
+  CLI-only, never mounted on a route.
 
 ## Frontend architecture (`web/`)
 
@@ -139,6 +151,13 @@ pre-paint theme script to stay external (`web/public/theme-init.js`), not inline
 
 For a **local non-technical demo**, root-level `START-HERE.txt` + `*-website.bat` +
 `deployments/docker-compose.customer.yml` launch the whole stack by double-click (see `docs/dev_run.md` §6.1).
+
+**Self-hosting (plan C3):** `deployments/pi/` is the Raspberry Pi kit — compose (mongo + api,
+api on `127.0.0.1:8080` only, fixed network `172.30.42.0/24` whose gateway is the trusted proxy),
+`backup.sh`/`restore.sh`/`update.sh` (+ `lib.sh`) and systemd timers. Public access is Tailscale
+Funnel on the host. `update.sh` tags the running image for rollback **before** pulling (with the
+containerd image store an untagged image is deleted at once). The admin handbook is
+`docs/operations.md` — keep it in sync with the kit. Lint scripts with `shellcheck -x`.
 
 The `Dockerfile` builds **multi-arch** (amd64 + arm64 for the Raspberry Pi host): build stages run on
 `$BUILDPLATFORM` and Go cross-compiles via `TARGETOS`/`TARGETARCH` — keep it pure Go

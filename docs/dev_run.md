@@ -3,10 +3,11 @@
 How to run the backend on your machine, exercise it, and shut it down cleanly.
 
 > **Keep this current:** this document is updated at the end of every implementation
-> step. It reflects the app **as of Step C2 (CI/CD pipeline)**.
+> step. It reflects the app **as of Step C3 (self-hosting on a Raspberry Pi)**.
 > Backend is complete through Step 9; the frontend (Phase B) lives in `web/` — see
 > [§5 Frontend](#5-frontend-phase-b) and [`web/README.md`](../web/README.md). Production
 > serving is §6 and continuous integration is [§7](#7-continuous-integration-github-actions).
+> Running the production site on the Pi is in the admin handbook, [`operations.md`](operations.md).
 
 ---
 
@@ -78,6 +79,9 @@ for a local run. Common overrides:
 | `CORS_ALLOWED_ORIGINS` | empty | comma-separated SPA origins (no `*`, credentials are used) |
 | `RATE_LIMIT_AUTH_REQUESTS` | `20` | max auth requests per window per client IP; **`0` disables** rate limiting |
 | `RATE_LIMIT_AUTH_WINDOW` | `1m` | the rate-limit window duration |
+| `TRUSTED_PROXIES` | empty | comma-separated IPs/CIDRs of reverse proxies allowed to state the client IP; empty = never trust forwarding headers |
+| `CLIENT_IP_HEADER` | `X-Forwarded-For` | header read from a trusted proxy; must hold **one** IP (chains are ignored) |
+| `REGISTRATION_INVITE_CODE` | empty | non-empty (≥ 8 chars) makes sign-up invite-only; empty = open registration |
 
 Example with overrides:
 
@@ -423,16 +427,53 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
 
 ### 7.1 One-time GitHub settings (after the first green run)
 
-1. **Make the image public.** On GitHub, open your profile, then *Packages* →
-   *thisisyouryear* → *Package settings* → *Change visibility* → **Public**. Hosts (the
-   Raspberry Pi) can then pull it without credentials.
-2. **Protect `master`.** Go to *Settings* → *Branches* (or *Rules* → *Rulesets*), add a rule for
-   `master` and require the status checks **`backend`**, **`backend-integration`** and
-   **`frontend`**.
+1. **Image visibility.** The package is already **public**: an anonymous pull works (checked
+   2026-11-11). To check or change it, open
+   *github.com/YehorBoldarev* → *Packages* tab → **thisisyouryear**. The badge next to the name
+   says *Public*/*Private*. *Package settings* (right sidebar) → *Danger Zone* → *Change
+   visibility*.
+   - **Verify from any machine without logging in:**
+     `docker buildx imagetools inspect ghcr.io/yehorboldarev/thisisyouryear:latest`.
+     It lists `linux/amd64` and `linux/arm64`.
+2. **Protect `master` with a ruleset.** Go to *Settings* → *Rules* → *Rulesets* → *New ruleset* →
+   *New branch ruleset*:
+   - Name `master`; *Enforcement status* **Active**.
+   - *Targets* → *Add target* → **Include default branch**.
+   - Keep **Restrict deletions** and **Block force pushes** (on by default).
+   - **Require a pull request before merging**, with *Required approvals* **0**. You're the
+     only developer, and GitHub won't let you approve your own PR.
+   - **Require status checks to pass** → *Add checks* → **`backend`**,
+     **`backend-integration`**, **`frontend`**, **`docker`**. `docker` makes sure a PR can't
+     break the image build; checks are listed once they've run in the last week.
+   - *Create*.
+   - **Effect:** `git push origin master` is now **rejected**. Work on a branch, push it, open a
+     PR, and merge when the four checks are green; the merge then publishes `:latest`. To keep
+     an emergency direct-push escape hatch, add *Repository admin* to the ruleset's *Bypass list*.
 
 ---
 
 ## Changelog
+
+- **Step C3 — Self-hosting on a Raspberry Pi (Tailscale Funnel):**
+  - **Real visitor IP.** New `clientIPMiddleware`: `TRUSTED_PROXIES` + `CLIENT_IP_HEADER`
+    (single IP only). The rate limiter, session IP and access log (`client_ip` + `remote_ip`) all
+    use the resolved IP. Empty config = previous behaviour.
+  - **Invite-only sign-up.** `REGISTRATION_INVITE_CODE` (≥ 8 chars; empty = open), an optional
+    `inviteCode` on `POST /auth/register` (422 `fields.inviteCode`: `is required` / `is not valid`,
+    constant-time compare), and new `GET /auth/registration` → `{inviteRequired}`. The sign-up page
+    shows an "Invite code" field when needed, prefilled from `/register?invite=…`.
+  - **Operator commands** in the binary: `api healthcheck` (checks `/readyz`) and
+    `api admin list-users|reset-password --email X` (temporary password, signs the person out
+    everywhere).
+  - **Pi kit** `deployments/pi/`: compose file, `.env.example`, `backup.sh`, `restore.sh`
+    (`--drill`), `update.sh` (backup → update → automatic rollback), and systemd timers.
+  - **Admin handbook** `docs/operations.md`.
+  - **Verified:**
+    - Go gates, unit and integration tests;
+    - web gates (182 tests);
+    - shellcheck and `systemd-analyze`;
+    - a full local rehearsal of the kit, including a broken release that rolled back
+      automatically.
 
 - **Step C2 — CI/CD pipeline (GitHub Actions):**
   - **Workflow:** `.github/workflows/ci.yml` with four jobs.
@@ -468,7 +509,8 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
       JSON 404);
     - `docker buildx` for amd64 + arm64 (the arm64 binary is a static aarch64 ELF);
     - both compose builds.
-  - **Pending:** the first real Actions run needs a push.
+  - **Verified on GitHub (2026-11-11):** all four jobs green on the first run, and the published
+    image is public and multi-arch.
 
 - **Fix — Mobile "New ＋" tab did nothing:** the tab bar lives in the app shell, but the topic
   popups were owned by a `ModalHost` inside the Dashboard page, so the shell passed it a no-op.

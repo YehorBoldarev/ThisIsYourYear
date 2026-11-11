@@ -7,7 +7,13 @@ export interface AuthContextValue {
   status: AuthStatus
   user: UserResponse | null
   login: (email: string, password: string, rememberMe: boolean) => Promise<void>
-  register: (email: string, displayName: string, password: string) => Promise<void>
+  /** `inviteCode` is sent only when non-empty (invite-only servers require it). */
+  register: (
+    email: string,
+    displayName: string,
+    password: string,
+    inviteCode?: string,
+  ) => Promise<void>
   logout: () => Promise<void>
 }
 

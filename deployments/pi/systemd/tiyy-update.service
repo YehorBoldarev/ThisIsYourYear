@@ -1,0 +1,11 @@
+[Unit]
+Description=ThisIsYourYear app update with automatic rollback (deployments/pi/update.sh)
+Documentation=file:///opt/thisisyouryear/docs/operations.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/thisisyouryear/deployments/pi/update.sh
+TimeoutStartSec=30min
