@@ -1,40 +1,14 @@
 /*
- * Client-side derivation of "wins" — there is no backend achievements endpoint.
- * A win is a completed milestone flagged as an achievement (★). We flatten the
- * caller's topics + their goal lists into achievements, and compute the celebration
- * stat strip (screen 7) for a topic that just reached 100%.
+ * Wins and celebration statistics. A win is a completed milestone flagged as an
+ * achievement (★); the server lists them (`GET /achievements`). This module
+ * holds the Wins item type and computes the celebration stat strip (screen 7)
+ * for a topic that just reached 100%.
  */
+import type { components } from '../api/schema'
 import type { Topic } from '../features/topics/useTopics'
-import type { Goal } from '../features/topics/useTopicGoals'
 
-export interface Achievement {
-  goal: Goal
-  topic: Topic
-}
-
-function completedTime(goal: Goal): number {
-  const t = goal.completedAt ? Date.parse(goal.completedAt) : NaN
-  return Number.isNaN(t) ? 0 : t
-}
-
-/**
- * Completed, starred milestones across the given topics, newest completion first.
- * Milestones with no `completedAt` sort last.
- */
-export function deriveAchievements(
-  topics: Topic[],
-  goalsByTopic: Record<string, Goal[] | undefined>,
-): Achievement[] {
-  const items: Achievement[] = []
-  for (const topic of topics) {
-    const goals = goalsByTopic[topic.id]
-    if (!goals) continue
-    for (const goal of goals) {
-      if (goal.status === 'done' && goal.isAchievement) items.push({ goal, topic })
-    }
-  }
-  return items.sort((a, b) => completedTime(b.goal) - completedTime(a.goal))
-}
+/** One win: the finished, starred milestone and a summary of its big goal. */
+export type Achievement = components['schemas']['Achievement']
 
 export interface CelebrationStats {
   /** "6/6" — completed over total milestones. */

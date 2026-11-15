@@ -37,6 +37,17 @@ describe('AppShell', () => {
     expect(screen.getAllByText(TEST_USER.displayName).length).toBeGreaterThan(0)
   })
 
+  // Regression (2026-11-15): on phones the fixed tab bar covered the footer
+  // because the space was reserved on <main>, which ends before the footer.
+  it('reserves the mobile tab bar height below the footer, not just below the content', async () => {
+    await renderShell('dark')
+    const footer = screen.getByRole('contentinfo')
+    const reserving = footer.closest('[class*="safe-area-inset-bottom"]')
+    expect(reserving).not.toBeNull()
+    expect(reserving).toContainElement(footer)
+    expect(document.getElementById('main')?.className).not.toMatch(/\bpb-/)
+  })
+
   it('exposes a skip link that targets the main landmark', async () => {
     await renderShell('dark')
     const skip = screen.getByRole('link', { name: 'Skip to content' })

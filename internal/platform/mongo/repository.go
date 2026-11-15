@@ -116,6 +116,35 @@ func (r *Repository[T, PT]) UpdateBy(ctx context.Context, filter bson.M, fields 
 	return res.MatchedCount, nil
 }
 
+// FilteredSet is one document update for SetEach: the filter that selects it
+// and the fields to $set on it.
+type FilteredSet struct {
+	Filter bson.M
+	Fields bson.M
+}
+
+// SetEach applies several single-document $set updates in one bulk write (one
+// round trip), bumping updatedAt on each, and returns how many documents
+// matched. It is not a transaction: callers validate their input first.
+func (r *Repository[T, PT]) SetEach(ctx context.Context, updates []FilteredSet) (int64, error) {
+	if len(updates) == 0 {
+		return 0, nil
+	}
+	now := r.clock().UTC()
+	models := make([]mongo.WriteModel, 0, len(updates))
+	for _, u := range updates {
+		set := make(bson.M, len(u.Fields)+1)
+		maps.Copy(set, u.Fields)
+		set["updatedAt"] = now
+		models = append(models, mongo.NewUpdateOneModel().SetFilter(u.Filter).SetUpdate(bson.M{"$set": set}))
+	}
+	res, err := r.coll.BulkWrite(ctx, models)
+	if err != nil {
+		return 0, translate(err)
+	}
+	return res.MatchedCount, nil
+}
+
 // UpdateMany applies fields as a $set on every document matching filter and
 // bumps updatedAt on each. It returns the number of documents modified; matching
 // zero documents is not an error. Use it for bulk state changes such as revoking

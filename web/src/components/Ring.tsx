@@ -9,10 +9,19 @@ interface RingProps {
   color?: string
   /** Show the centered percent label. */
   showLabel?: boolean
+  /** Accessible name of the progressbar (e.g. "Run a half-marathon progress"). */
+  label?: string
 }
 
 /** A progress ring with a centered percent label (topic-detail progress mark). */
-export function Ring({ value, size = 84, accent = 'teal', color, showLabel = true }: RingProps) {
+export function Ring({
+  value,
+  size = 84,
+  accent = 'teal',
+  color,
+  showLabel = true,
+  label = 'Progress',
+}: RingProps) {
   const clamped = Math.max(0, Math.min(1, value))
   const stroke = Math.round(size * 0.09)
   const r = (size - stroke) / 2
@@ -25,6 +34,7 @@ export function Ring({ value, size = 84, accent = 'teal', color, showLabel = tru
       className="relative inline-flex items-center justify-center"
       style={{ width: size, height: size }}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}

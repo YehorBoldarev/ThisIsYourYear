@@ -12,6 +12,7 @@ export type IconName =
   | 'dot'
   | 'arrow-right'
   | 'trash'
+  | 'grip'
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   name: IconName
@@ -47,10 +48,21 @@ const paths: Record<IconName, ReactElement> = {
   dot: <circle cx="12" cy="12" r="5" />,
   'arrow-right': <path d="M4 12H20M14 6 20 12 14 18" />,
   trash: <path d="M4 7H20M9 7V5H15V7M6 7 7 20H17L18 7M10 11V16M14 11V16" />,
+  // Six-dot drag handle.
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1.6" />
+      <circle cx="15" cy="6" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" />
+      <circle cx="15" cy="12" r="1.6" />
+      <circle cx="9" cy="18" r="1.6" />
+      <circle cx="15" cy="18" r="1.6" />
+    </>
+  ),
 }
 
 // Glyphs that read as filled shapes rather than strokes.
-const filled: Partial<Record<IconName, boolean>> = { star: true, dot: true }
+const filled: Partial<Record<IconName, boolean>> = { star: true, dot: true, grip: true }
 
 export function Icon({ name, size = 20, title, ...rest }: IconProps) {
   const isFilled = filled[name]

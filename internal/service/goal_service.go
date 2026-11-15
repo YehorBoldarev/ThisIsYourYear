@@ -16,7 +16,8 @@ type GoalRepository interface {
 	ListForTopic(ctx context.Context, userID, topicID string) ([]domain.Goal, error)
 	UpdateForUser(ctx context.Context, id, userID string, upd domain.GoalUpdate) error
 	DeleteForUser(ctx context.Context, id, userID string) error
-	CountForTopic(ctx context.Context, userID, topicID string) (int, error)
+	NextOrder(ctx context.Context, userID, topicID string) (int, error)
+	SetOrder(ctx context.Context, userID, topicID string, goalIDs []string) error
 }
 
 // TopicOwnershipReader lets the goal service confirm a topic belongs to the
@@ -54,11 +55,12 @@ func (s *GoalService) Create(ctx context.Context, userID, topicID string, in Cre
 	if err != nil {
 		return nil, err
 	}
-	count, err := s.goals.CountForTopic(ctx, userID, topicID)
+	// After the current last goal; a count would collide once deletions leave gaps.
+	next, err := s.goals.NextOrder(ctx, userID, topicID)
 	if err != nil {
 		return nil, err
 	}
-	goal.Order = count
+	goal.Order = next
 	if err := s.goals.Create(ctx, goal); err != nil {
 		return nil, err
 	}
@@ -86,6 +88,45 @@ func (s *GoalService) Update(ctx context.Context, userID, goalID string, upd dom
 		return nil, err
 	}
 	return s.goals.ByIDForUser(ctx, goalID, userID)
+}
+
+// Reorder sets the order of a topic's goals: goalIDs must list every goal under
+// the topic exactly once (so a stale client can't reorder a list that has
+// changed meanwhile), else a *domain.FieldError on "goalIds". Returns the goals
+// in their new order. A topic the caller does not own yields domain.ErrNotFound.
+func (s *GoalService) Reorder(ctx context.Context, userID, topicID string, goalIDs []string) ([]domain.Goal, error) {
+	if err := s.assertOwnsTopic(ctx, userID, topicID); err != nil {
+		return nil, err
+	}
+	current, err := s.goals.ListForTopic(ctx, userID, topicID)
+	if err != nil {
+		return nil, err
+	}
+	if !sameSet(current, goalIDs) {
+		return nil, &domain.FieldError{Field: "goalIds", Message: "must list every milestone of this goal exactly once"}
+	}
+	if err := s.goals.SetOrder(ctx, userID, topicID, goalIDs); err != nil {
+		return nil, err
+	}
+	return s.goals.ListForTopic(ctx, userID, topicID)
+}
+
+// sameSet reports whether ids names exactly the given goals, each once.
+func sameSet(goals []domain.Goal, ids []string) bool {
+	if len(goals) != len(ids) {
+		return false
+	}
+	want := make(map[string]bool, len(goals))
+	for _, g := range goals {
+		want[g.ID] = true
+	}
+	for _, id := range ids {
+		if !want[id] {
+			return false // unknown, or a duplicate (already consumed)
+		}
+		delete(want, id)
+	}
+	return true
 }
 
 // Delete removes the caller's goal.

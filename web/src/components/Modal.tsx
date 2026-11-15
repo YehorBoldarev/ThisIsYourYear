@@ -36,6 +36,10 @@ export function Modal({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Content that is mid-interaction (e.g. a keyboard drag, where Escape
+        // cancels the drag) marks itself with data-captures-escape; leave
+        // Escape to it instead of closing the whole dialog.
+        if (dialogRef.current?.querySelector('[data-captures-escape]')) return
         e.preventDefault()
         onClose()
         return

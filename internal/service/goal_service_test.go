@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,6 +43,7 @@ func (m *memGoalRepo) ListForTopic(_ context.Context, userID, topicID string) ([
 			out = append(out, *g)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Order < out[j].Order })
 	return out, nil
 }
 
@@ -75,14 +77,25 @@ func (m *memGoalRepo) DeleteForUser(_ context.Context, id, userID string) error 
 	return nil
 }
 
-func (m *memGoalRepo) CountForTopic(_ context.Context, userID, topicID string) (int, error) {
-	n := 0
+func (m *memGoalRepo) NextOrder(_ context.Context, userID, topicID string) (int, error) {
+	next := 0
 	for _, g := range m.goals {
-		if g.UserID == userID && g.TopicID == topicID {
-			n++
+		if g.UserID == userID && g.TopicID == topicID && g.Order >= next {
+			next = g.Order + 1
 		}
 	}
-	return n, nil
+	return next, nil
+}
+
+func (m *memGoalRepo) SetOrder(_ context.Context, userID, topicID string, ids []string) error {
+	for i, id := range ids {
+		g, ok := m.goals[id]
+		if !ok || g.UserID != userID || g.TopicID != topicID {
+			return domain.ErrNotFound
+		}
+		g.Order = i
+	}
+	return nil
 }
 
 // stubTopicOwner reports ownership for a fixed (user, topic) pair.
@@ -171,4 +184,60 @@ func TestGoalService_OwnershipIsolation(t *testing.T) {
 
 	err = svc.Delete(ctx, "intruder", g.ID)
 	require.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func titles(goals []domain.Goal) []string {
+	out := make([]string, len(goals))
+	for i, g := range goals {
+		out[i] = g.Title
+	}
+	return out
+}
+
+func TestGoalService_CreateAfterDeletionDoesNotCollide(t *testing.T) {
+	svc := NewGoalService(newMemGoalRepo(), stubTopicOwner{owner: "u", topicID: "t"})
+	ctx := context.Background()
+	a, _ := svc.Create(ctx, "u", "t", CreateGoalInput{Title: "A"}) // order 0
+	_, _ = svc.Create(ctx, "u", "t", CreateGoalInput{Title: "B"})  // order 1
+	require.NoError(t, svc.Delete(ctx, "u", a.ID))
+	c, err := svc.Create(ctx, "u", "t", CreateGoalInput{Title: "C"})
+	require.NoError(t, err)
+	require.Equal(t, 2, c.Order, "after the last one, not at the count (1 would collide with B)")
+}
+
+func TestGoalService_Reorder(t *testing.T) {
+	svc := NewGoalService(newMemGoalRepo(), stubTopicOwner{owner: "u", topicID: "t"})
+	ctx := context.Background()
+	var ids []string
+	for _, title := range []string{"A", "B", "C"} {
+		g, err := svc.Create(ctx, "u", "t", CreateGoalInput{Title: title})
+		require.NoError(t, err)
+		ids = append(ids, g.ID)
+	}
+
+	got, err := svc.Reorder(ctx, "u", "t", []string{ids[2], ids[0], ids[1]})
+	require.NoError(t, err)
+	require.Equal(t, []string{"C", "A", "B"}, titles(got))
+
+	listed, err := svc.ListForTopic(ctx, "u", "t")
+	require.NoError(t, err)
+	require.Equal(t, []string{"C", "A", "B"}, titles(listed), "persisted")
+
+	for name, bad := range map[string][]string{
+		"missing one": {ids[0], ids[1]},
+		"extra id":    {ids[0], ids[1], ids[2], "goal-999"},
+		"duplicate":   {ids[0], ids[0], ids[1]},
+		"unknown":     {ids[0], ids[1], "goal-999"},
+		"empty":       {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := svc.Reorder(ctx, "u", "t", bad)
+			var fe *domain.FieldError
+			require.ErrorAs(t, err, &fe)
+			require.Equal(t, "goalIds", fe.Field)
+		})
+	}
+
+	_, err = svc.Reorder(ctx, "intruder", "t", ids)
+	require.ErrorIs(t, err, domain.ErrNotFound, "someone else's topic")
 }

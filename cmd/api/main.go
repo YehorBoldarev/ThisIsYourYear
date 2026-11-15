@@ -26,7 +26,7 @@ import (
 
 func main() {
 	if len(os.Args) > 1 {
-		os.Exit(runCommand(os.Args[1:], os.Stdout, os.Stderr))
+		os.Exit(runCommand(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 	}
 	if err := run(); err != nil {
 		// The logger may not exist yet if configuration failed, so fall back to
@@ -92,14 +92,15 @@ func run() error {
 	dashboardService := service.NewDashboardService(topicService)
 
 	router := transporthttp.NewRouter(transporthttp.RouterDeps{
-		Logger:           logger,
-		Pinger:           mongoClient,
-		AuthService:      authService,
-		UserService:      userService,
-		TopicService:     topicService,
-		GoalService:      goalService,
-		DashboardService: dashboardService,
-		TokenVerifier:    tokenIssuer,
+		Logger:             logger,
+		Pinger:             mongoClient,
+		AuthService:        authService,
+		UserService:        userService,
+		TopicService:       topicService,
+		GoalService:        goalService,
+		DashboardService:   dashboardService,
+		AchievementService: service.NewAchievementService(topicRepo, goalRepo),
+		TokenVerifier:      tokenIssuer,
 		RefreshCookie: transporthttp.RefreshCookieConfig{
 			Name:   "refresh_token",
 			Path:   "/api/v1/auth",

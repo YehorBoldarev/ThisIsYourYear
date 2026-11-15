@@ -63,6 +63,31 @@ func (h *GoalHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, goalResponses(goals))
 }
 
+// Reorder handles PUT /topics/{id}/goals/order: the body lists every goal of
+// the topic in its new order; the response is the goals in that order.
+func (h *GoalHandler) Reorder(w http.ResponseWriter, r *http.Request) {
+	userID, ok := UserID(r.Context())
+	if !ok {
+		respondError(w, h.logger, r, domain.ErrUnauthenticated)
+		return
+	}
+	var req ReorderGoalsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		respondError(w, h.logger, r, err)
+		return
+	}
+	if err := validateStruct(req); err != nil {
+		respondError(w, h.logger, r, err)
+		return
+	}
+	goals, err := h.svc.Reorder(r.Context(), userID, chi.URLParam(r, "id"), req.GoalIDs)
+	if err != nil {
+		respondError(w, h.logger, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, goalResponses(goals))
+}
+
 // Update handles PATCH /goals/{id}.
 func (h *GoalHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := UserID(r.Context())

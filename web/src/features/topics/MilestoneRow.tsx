@@ -1,24 +1,48 @@
+import type { CSSProperties, ReactNode } from 'react'
 import { Icon } from '../../components'
 import { cn } from '../../lib/cn'
 import { formatDueShort } from '../../lib/date'
 import type { Goal } from './useTopicGoals'
 
-interface MilestoneRowProps {
+export interface MilestoneRowProps {
   goal: Goal
   accent: string
   onToggle: (goal: Goal) => void
   onEdit: (goal: Goal) => void
   onDelete: (goal: Goal) => void
+  /** Drag-and-drop wiring (see SortableMilestones); all optional. */
+  rootRef?: (el: HTMLLIElement | null) => void
+  rootStyle?: CSSProperties
+  dragging?: boolean
+  handle?: ReactNode
 }
 
-/** One checklist row: status token + label + trailing tag/date + edit/delete. */
-export function MilestoneRow({ goal, accent, onToggle, onEdit, onDelete }: MilestoneRowProps) {
+/** One checklist row: drag handle + status token + label + trailing tag/date + edit/delete. */
+export function MilestoneRow({
+  goal,
+  accent,
+  onToggle,
+  onEdit,
+  onDelete,
+  rootRef,
+  rootStyle,
+  dragging = false,
+  handle,
+}: MilestoneRowProps) {
   const done = goal.status === 'done'
   const achievement = goal.isAchievement
   const due = formatDueShort(goal.dueDate ?? '')
 
   return (
-    <li className="group flex items-center gap-3 py-2.5">
+    <li
+      ref={rootRef}
+      style={rootStyle}
+      className={cn(
+        'group flex items-center gap-3 py-2.5',
+        dragging && 'relative z-10 rounded-field bg-elevated shadow-popup',
+      )}
+    >
+      {handle}
       <button
         type="button"
         onClick={() => onToggle(goal)}

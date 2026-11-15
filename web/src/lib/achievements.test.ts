@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { celebrationStats, deriveAchievements } from './achievements'
+import { celebrationStats } from './achievements'
 import type { Topic } from '../features/topics/useTopics'
-import type { Goal } from '../features/topics/useTopicGoals'
 
 function topic(over: Partial<Topic> = {}): Topic {
   return {
@@ -21,51 +20,6 @@ function topic(over: Partial<Topic> = {}): Topic {
     ...over,
   }
 }
-
-function goal(over: Partial<Goal> = {}): Goal {
-  return {
-    id: 'g1',
-    topicId: 't1',
-    title: 'First 10k',
-    notes: '',
-    status: 'done',
-    order: 0,
-    isAchievement: true,
-    dueDate: '',
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    ...over,
-  }
-}
-
-describe('deriveAchievements', () => {
-  it('keeps only completed, starred milestones', () => {
-    const t = topic()
-    const goals = [
-      goal({ id: 'a', status: 'done', isAchievement: true }),
-      goal({ id: 'b', status: 'done', isAchievement: false }), // done but not starred
-      goal({ id: 'c', status: 'todo', isAchievement: true }), // starred but not done
-    ]
-    const items = deriveAchievements([t], { t1: goals })
-    expect(items.map((i) => i.goal.id)).toEqual(['a'])
-    expect(items[0].topic.id).toBe('t1')
-  })
-
-  it('sorts by completion date, newest first, undated last', () => {
-    const t = topic()
-    const goals = [
-      goal({ id: 'old', completedAt: '2026-02-01T00:00:00Z' }),
-      goal({ id: 'undated', completedAt: undefined }),
-      goal({ id: 'new', completedAt: '2026-09-01T00:00:00Z' }),
-    ]
-    const items = deriveAchievements([t], { t1: goals })
-    expect(items.map((i) => i.goal.id)).toEqual(['new', 'old', 'undated'])
-  })
-
-  it('ignores topics whose goals have not loaded yet', () => {
-    expect(deriveAchievements([topic()], {})).toEqual([])
-  })
-})
 
 describe('celebrationStats', () => {
   it('computes milestones, duration, and rank', () => {

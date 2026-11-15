@@ -7,6 +7,7 @@ import { server, goalResponse, topicResponse, errorBody } from '../../test/msw'
 import type { Topic } from './useTopics'
 import type { Goal } from './useTopicGoals'
 import { useToggleGoalDone } from './mutations'
+import { ACHIEVEMENTS_KEY } from '../achievements/useAchievements'
 
 // No component observes these queries, so invalidate-on-settle won't refetch —
 // the optimistic writes (and rollbacks) stay put and are directly assertable.
@@ -65,5 +66,21 @@ describe('useToggleGoalDone', () => {
       expect(qc.getQueryData<Goal[]>(['goals', 't1'])?.[0].status).toBe('todo')
       expect(qc.getQueryData<Topic[]>(['topics', {}])?.[0].progress.completed).toBe(0)
     })
+  })
+})
+
+describe('Wins stay current', () => {
+  it('completing (or starring) a milestone marks the Wins list stale', async () => {
+    server.use(
+      http.patch('/api/v1/goals/:id', () =>
+        HttpResponse.json(goalResponse({ id: 'g1', status: 'done', isAchievement: true })),
+      ),
+    )
+    const { qc, wrapper } = seed()
+    qc.setQueryData(ACHIEVEMENTS_KEY, [])
+    const { result } = renderHook(() => useToggleGoalDone(), { wrapper })
+
+    act(() => result.current.toggle(goal()))
+    await waitFor(() => expect(qc.getQueryState(ACHIEVEMENTS_KEY)?.isInvalidated).toBe(true))
   })
 })

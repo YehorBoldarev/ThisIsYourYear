@@ -20,7 +20,7 @@ export function BottomTabBar({ onNew }: { onNew: () => void }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-bar sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-bar pb-[env(safe-area-inset-bottom)] sm:hidden"
     >
       {TABS.map((tab) => (
         <NavLink

@@ -450,19 +450,21 @@ yet (it's in the backlog), so they keep using the temporary one.
 
 ### 7.5 Remove an account
 
-There's no command for this yet. This deletes the account **and all of its goals**, so take a
-backup first:
+This permanently deletes the account **and all of its goals**, so take a backup first:
 
 ```bash
 sudo ./backup.sh
-sudo docker compose exec -T mongo mongosh thisisyouryear --quiet --eval '
-  const u = db.users.findOne({ email: "someone@example.com" });   // lower-case email
-  if (!u) { print("no such account"); quit(1); }
-  print("goals",    db.goals.deleteMany({ userId: u._id }).deletedCount);
-  print("topics",   db.topics.deleteMany({ userId: u._id }).deletedCount);
-  print("sessions", db.sessions.deleteMany({ userId: u._id }).deletedCount);
-  print("user",     db.users.deleteOne({ _id: u._id }).deletedCount);'
+sudo docker compose exec api /app/api admin delete-user --email someone@example.com
 ```
+
+1. **It shows what will go**, e.g. *"This permanently deletes someone@example.com (Someone) and
+   everything in it: 3 big goals, 17 milestones, 2 sign-in sessions."*
+2. **It asks you to type the email to confirm.** Anything else cancels, and nothing is deleted.
+3. **It deletes:** milestones, then big goals, then sign-in sessions, then the account. If it's
+   interrupted, running it again finishes the job.
+
+For scripts, `--yes` skips the question. To undo a mistake, restore the backup you just took
+([§5.4](#54-restore-after-a-mistake)); that also brings back anything others wrote since.
 
 ### 7.6 The preparation stage for 2027
 
