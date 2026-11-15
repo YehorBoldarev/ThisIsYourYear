@@ -83,6 +83,9 @@ sudo nano .env                # …paste it after JWT_SECRET=, and choose REGIST
 
 - **`REGISTRATION_INVITE_CODE`:** at least 8 characters, easy to type, not guessable
   (e.g. `sunflower-meadow-2027`). Avoid `$`.
+- **`PREPARATION_YEAR=2027`** (already in the template) turns on the preparation stage
+  ([§7.6](#76-the-preparation-stage-for-2027)). Set **`APP_TIMEZONE`** to where most of your
+  users live (e.g. `Europe/Kyiv`); it's only used when a browser doesn't send its own timezone.
 - **Keep a copy of `.env` somewhere safe** (a password manager). You need it to rebuild the Pi.
 - **Backups to a USB drive** (recommended): see [§5.2](#52-backups-on-a-usb-drive), then set
   `BACKUP_DIR` accordingly.
@@ -417,6 +420,10 @@ known problems.
 Send them `https://<machine>.<tailnet>.ts.net/register?invite=<REGISTRATION_INVITE_CODE>`.
 The code is prefilled; they only choose a name, email and password.
 
+The code also survives other routes: a link to any page with `?invite=<code>` (e.g. the front page)
+takes a signed-out visitor straight to sign-up with the code filled in, and switching between
+"Sign in" and "Create an account" keeps it.
+
 ### 7.2 Change or close sign-up
 
 - **New code:** edit `REGISTRATION_INVITE_CODE` in `.env`, then run `sudo docker compose up -d`.
@@ -456,6 +463,21 @@ sudo docker compose exec -T mongo mongosh thisisyouryear --quiet --eval '
   print("sessions", db.sessions.deleteMany({ userId: u._id }).deletedCount);
   print("user",     db.users.deleteOne({ _id: u._id }).deletedCount);'
 ```
+
+### 7.6 The preparation stage for 2027
+
+- **What it does:** while `PREPARATION_YEAR=2027` is set and 2027 hasn't begun, the app is about
+  2027:
+  - the dashboard shows a live countdown to 1 January 2027;
+  - every goal people create belongs to 2027.
+- **At midnight it ends by itself.** Each person's own browser midnight is used, so family in
+  another timezone switch at *their* midnight. The app then works normally: it shows 2027's goals
+  and counts down to 2028.
+- **Nothing to do on New Year's Day.** Afterwards the setting has no effect; delete the line from
+  `.env` whenever you like (then `sudo docker compose up -d`).
+- **Check it's on:**
+  `sudo docker compose logs api | grep -m1 '"preparation_year"'` shows `"preparation_year":2027`.
+  It's logged at startup.
 
 ---
 

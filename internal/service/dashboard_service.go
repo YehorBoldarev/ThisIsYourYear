@@ -17,6 +17,7 @@ type DashboardTopics interface {
 // DashboardView is the aggregate landing summary for a user's year.
 type DashboardView struct {
 	Year             int
+	Phase            domain.Phase
 	Message          string
 	Progress         domain.Progress
 	TopicsTotal      int
@@ -26,26 +27,24 @@ type DashboardView struct {
 }
 
 // DashboardService composes the topic views into one year-level summary. It owns
-// no persistence of its own.
+// no persistence and no clock: the season (resolved per request) says which
+// year to summarise and when "now" is.
 type DashboardService struct {
 	topics DashboardTopics
-	now    func() time.Time
 }
 
-// NewDashboardService wires a DashboardService. The clock is injected so the
-// New-Year countdown is deterministic in tests; it defaults to time.Now.
-func NewDashboardService(topics DashboardTopics, now func() time.Time) *DashboardService {
-	if now == nil {
-		now = time.Now
-	}
-	return &DashboardService{topics: topics, now: now}
+// NewDashboardService wires a DashboardService.
+func NewDashboardService(topics DashboardTopics) *DashboardService {
+	return &DashboardService{topics: topics}
 }
 
-// Get builds the dashboard for the caller's current-year, non-archived topics:
-// aggregate progress, topic tallies, a positive message, and the New-Year
-// countdown.
-func (s *DashboardService) Get(ctx context.Context, userID string) (*DashboardView, error) {
-	views, err := s.topics.List(ctx, userID, nil, false)
+// Get builds the dashboard for the season's year (resolved per request from the
+// user's timezone and the preparation-stage setting): aggregate progress and
+// topic tallies over its non-archived topics, a positive message, and the
+// countdown — to the year's start while preparing, else to the next New Year.
+func (s *DashboardService) Get(ctx context.Context, userID string, season domain.Season) (*DashboardView, error) {
+	year := season.Year
+	views, err := s.topics.List(ctx, userID, &year, false)
 	if err != nil {
 		return nil, err
 	}
@@ -62,16 +61,20 @@ func (s *DashboardService) Get(ctx context.Context, userID string) (*DashboardVi
 	}
 
 	overall := domain.AggregateProgress(progresses)
-	now := s.now().UTC()
-	target, seconds := domain.Countdown(now)
+	message := domain.DashboardMessage(overall, len(views))
+	if season.Preparing {
+		message = domain.PreparationMessage(year, len(views))
+	}
+	target := season.CountdownTarget().UTC()
 
 	return &DashboardView{
-		Year:             domain.CurrentYear(),
-		Message:          domain.DashboardMessage(overall, len(views)),
+		Year:             year,
+		Phase:            season.Phase(),
+		Message:          message,
 		Progress:         overall,
 		TopicsTotal:      len(views),
 		TopicsCompleted:  completedTopics,
 		CountdownTarget:  target,
-		SecondsRemaining: seconds,
+		SecondsRemaining: season.SecondsRemaining(),
 	}, nil
 }

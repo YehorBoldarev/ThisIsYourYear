@@ -11,6 +11,18 @@ export type UserResponse = components['schemas']['User']
 // default (no `credentials: 'include'` needed).
 const ORIGIN = typeof window !== 'undefined' ? window.location.origin : ''
 
+/**
+ * The browser's IANA timezone, sent on every request so the server decides
+ * "which year is it" (and the New-Year countdown) by the user's own midnight.
+ */
+const CLIENT_TIMEZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
+  } catch {
+    return ''
+  }
+})()
+
 const AUTH_PREFIX = '/api/v1/auth/'
 function isAuthPath(url: string): boolean {
   return new URL(url).pathname.startsWith(AUTH_PREFIX)
@@ -49,6 +61,7 @@ export const client = createClient<paths>({
 
 client.use({
   onRequest({ request }) {
+    if (CLIENT_TIMEZONE) request.headers.set('X-Client-Timezone', CLIENT_TIMEZONE)
     const token = getToken()
     // Auth endpoints authenticate via the cookie, not the bearer token.
     if (token && !isAuthPath(request.url)) {

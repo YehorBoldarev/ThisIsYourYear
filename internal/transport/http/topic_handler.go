@@ -15,13 +15,15 @@ import (
 // the authenticated context, so the routes must be mounted behind the auth
 // middleware.
 type TopicHandler struct {
-	svc    *service.TopicService
-	logger *slog.Logger
+	svc     *service.TopicService
+	seasons *SeasonResolver
+	logger  *slog.Logger
 }
 
-// NewTopicHandler builds a TopicHandler.
-func NewTopicHandler(svc *service.TopicService, logger *slog.Logger) *TopicHandler {
-	return &TopicHandler{svc: svc, logger: logger}
+// NewTopicHandler builds a TopicHandler. seasons supplies the default year
+// (the season year) when a request doesn't name one.
+func NewTopicHandler(svc *service.TopicService, seasons *SeasonResolver, logger *slog.Logger) *TopicHandler {
+	return &TopicHandler{svc: svc, seasons: seasons, logger: logger}
 }
 
 // Create handles POST /topics.
@@ -40,7 +42,12 @@ func (h *TopicHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondError(w, h.logger, r, err)
 		return
 	}
-	view, err := h.svc.Create(r.Context(), userID, req.toInput())
+	in := req.toInput()
+	if in.Year == 0 {
+		// During the preparation stage this is the year being planned.
+		in.Year = h.seasons.Resolve(r).Year
+	}
+	view, err := h.svc.Create(r.Context(), userID, in)
 	if err != nil {
 		respondError(w, h.logger, r, err)
 		return
@@ -59,6 +66,10 @@ func (h *TopicHandler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, h.logger, r, err)
 		return
+	}
+	if year == nil {
+		seasonYear := h.seasons.Resolve(r).Year
+		year = &seasonYear
 	}
 	includeArchived := r.URL.Query().Get("includeArchived") == "true"
 

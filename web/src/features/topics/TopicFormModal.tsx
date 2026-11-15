@@ -5,6 +5,7 @@ import { isApiError, type FieldErrors } from '../../api/errors'
 import { toApiDate, toInputDate } from '../../lib/date'
 import type { Topic } from './useTopics'
 import { useCreateTopic, useUpdateTopic } from './mutations'
+import { useSeason } from '../dashboard/useSeason'
 
 interface TopicFormModalProps {
   /** Present → edit that chapter; absent → create a new one. */
@@ -13,6 +14,7 @@ interface TopicFormModalProps {
 }
 
 export function TopicFormModal({ topic, onClose }: TopicFormModalProps) {
+  const season = useSeason()
   const editing = !!topic
   const [title, setTitle] = useState(topic?.title ?? '')
   const [description, setDescription] = useState(topic?.description ?? '')
@@ -73,7 +75,7 @@ export function TopicFormModal({ topic, onClose }: TopicFormModalProps) {
     <Modal
       open
       onClose={onClose}
-      eyebrow={editing ? 'Edit chapter' : `New for ${new Date().getFullYear()}`}
+      eyebrow={editing ? 'Edit chapter' : `New for ${season.year}`}
       title={editing ? 'Edit big goal' : 'Create a big goal'}
       width={560}
     >

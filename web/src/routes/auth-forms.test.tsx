@@ -151,4 +151,28 @@ describe('Register', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByText('is not valid')).toBeInTheDocument()
   })
+
+  it('keeps the invite code when switching to sign-in and back', async () => {
+    server.use(inviteOnly())
+    renderAt('/register?invite=sunflower-2027')
+    const signIn = await screen.findByRole('link', { name: 'Sign in' })
+    expect(signIn).toHaveAttribute('href', '/login?invite=sunflower-2027')
+
+    await userEvent.setup().click(signIn)
+    expect(await screen.findByRole('link', { name: 'Create an account' })).toHaveAttribute(
+      'href',
+      '/register?invite=sunflower-2027',
+    )
+  })
+
+  it('carries a typed code to sign-in too', async () => {
+    server.use(inviteOnly())
+    const user = userEvent.setup()
+    renderAt('/register')
+    await user.type(await screen.findByLabelText('Invite code'), 'typed-code-1')
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/login?invite=typed-code-1',
+    )
+  })
 })

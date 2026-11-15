@@ -4,6 +4,7 @@ import { useDashboard } from './useDashboard'
 import { useTopics } from '../topics/useTopics'
 import { DateGreeting } from './DateGreeting'
 import { YearProgress } from './YearProgress'
+import { NewYearCountdown } from './NewYearCountdown'
 import { DashboardSkeleton } from './DashboardSkeleton'
 import { ChaptersSection } from '../topics/ChaptersSection'
 import { EmptyState } from '../topics/EmptyState'
@@ -42,14 +43,26 @@ export function Dashboard() {
 
   const { data: dash } = dashboard
   const chapters = topics.data
+  // Preparation stage: the year being planned hasn't begun; count down to it.
+  const preparing = dash.phase === 'preparation'
+  const countdown = preparing ? (
+    <NewYearCountdown
+      target={dash.countdown.target}
+      year={dash.year}
+      onReached={() => {
+        void dashboard.refetch()
+        void topics.refetch()
+      }}
+    />
+  ) : null
 
   // Topic popups come from the app-level ModalHost (see App.tsx).
   return chapters.length === 0 ? (
-    <EmptyState />
+    <EmptyState year={dash.year} preparing={preparing} countdown={countdown} />
   ) : (
     <div className="mx-auto w-full max-w-[680px] px-6 py-12">
       <DateGreeting name={user?.displayName ?? ''} message={dash.message} />
-      <YearProgress secondsRemaining={dash.countdown.secondsRemaining} />
+      {countdown ?? <YearProgress secondsRemaining={dash.countdown.secondsRemaining} />}
       <ChaptersSection topics={chapters} />
     </div>
   )

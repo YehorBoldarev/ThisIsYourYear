@@ -54,28 +54,21 @@ func TestDashboardMessage(t *testing.T) {
 	}
 }
 
-func TestCountdown(t *testing.T) {
-	now := time.Date(2026, time.July, 7, 12, 0, 0, 0, time.UTC)
-	target, secs := Countdown(now)
+func TestPreparationMessage(t *testing.T) {
+	if got, want := PreparationMessage(2027, 0), "Your 2027 is a blank page. Plan the first goal before the year begins."; got != want {
+		t.Fatalf("no topics = %q, want %q", got, want)
+	}
+	if got, want := PreparationMessage(2027, 3), "Every goal you plan now is a head start. 2027 is almost here."; got != want {
+		t.Fatalf("with topics = %q, want %q", got, want)
+	}
+}
 
-	want := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC)
-	if !target.Equal(want) {
-		t.Fatalf("target = %v, want %v", target, want)
+func TestSecondsUntil(t *testing.T) {
+	target := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC)
+	if got := SecondsUntil(target, target.Add(-90*time.Second)); got != 90 {
+		t.Fatalf("90s before = %d, want 90", got)
 	}
-	if secs <= 0 {
-		t.Fatalf("secondsRemaining = %d, want > 0", secs)
-	}
-	if wantSecs := int64(want.Sub(now).Seconds()); secs != wantSecs {
-		t.Fatalf("secondsRemaining = %d, want %d", secs, wantSecs)
-	}
-
-	// A late-December "now" still targets the coming Jan 1 with a small positive remainder.
-	lateDec := time.Date(2026, time.December, 31, 23, 59, 0, 0, time.UTC)
-	target2, secs2 := Countdown(lateDec)
-	if !target2.Equal(want) {
-		t.Fatalf("late-Dec target = %v, want %v", target2, want)
-	}
-	if secs2 != 60 {
-		t.Fatalf("late-Dec secondsRemaining = %d, want 60", secs2)
+	if got := SecondsUntil(target, target.Add(time.Hour)); got != 0 {
+		t.Fatalf("after the target = %d, want 0 (floored)", got)
 	}
 }

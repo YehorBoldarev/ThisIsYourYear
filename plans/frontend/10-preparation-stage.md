@@ -1,6 +1,7 @@
 # Step D1 — Preparation stage for 2027, then year navigation
 
-> **Status:** Draft for approval (2026-11-11)
+> **Status:** Part A **approved and implemented** (2026-11-11, D1–D5 and D7 as recommended); see §8.
+> Part B (D6) awaits approval.
 > **Parent:** [`backlog.md`](../backlog.md) → *Year rollover & multi-year history* (time-sensitive).
 > **Builds on:** C3 (self-hosting). Part A should ship **before family is invited**.
 > **Approval gate:** No code is written until you approve this document. Parts A and B can be
@@ -276,3 +277,60 @@ api/openapi.yaml · schema.d.ts · docs
 | Then | Invite family: they plan 2027 with the countdown in front of them. |
 | December | Part B (year switcher), or early January at the latest. |
 | 1 Jan 2027, 00:00 local | The app switches to the normal 2027 flow by itself. |
+
+---
+
+## 8. Part A implementation notes (2026-11-11)
+
+**What was built:**
+- **Domain:** `domain.SeasonAt(now, loc, preparationYear)` → `Season{Year, Preparing, Now, StartsAt,
+  EndsAt}`, with `Phase()`, `CountdownTarget()` and `SecondsRemaining()`. `PreparationMessage` holds
+  the copy as drafted. The old `Countdown`/`NextNewYear` helpers were replaced.
+- **Config:** `PREPARATION_YEAR` (0/empty = off; 2000–2100) and `APP_TIMEZONE` (default `UTC`,
+  validated). The binary embeds `time/tzdata`.
+- **Transport:** `SeasonResolver` reads `X-Client-Timezone`.
+  - Missing, oversized or unknown names fall back to `APP_TIMEZONE`.
+  - Only valid zones are cached.
+  - Go's loader rejects path tricks.
+  - The topic create/list handlers default to the season year; the dashboard handler passes the
+    season.
+  - CORS allows the header.
+- **Dashboard service:** takes the `Season`, which now records the instant it was resolved for. The
+  service **no longer owns a clock**, so one request uses one clock reading. This was found when the
+  integration test injected a fixed clock and the old service still read the real one.
+- **API:** `Dashboard.phase` (`preparation` | `year`), a reusable `ClientTimezone` header parameter
+  on `GET /dashboard`, `GET /topics` and `POST /topics`, and updated descriptions. `schema.d.ts`
+  was regenerated.
+- **SPA:**
+  - `client.ts` sends `X-Client-Timezone` on every request.
+  - `useSeason()`/`seasonYear(qc)` read the season from the dashboard query.
+  - `NewYearCountdown` (D4) replaces the year bar while preparing, and also appears in the empty
+    state.
+  - The create popup says "New for 2027", and optimistic topics get the season year.
+  - The logo ring is empty while preparing (D5). `App.tsx` passes `preparing` to the shell, which
+    stays presentational.
+  - Gallery has countdown examples.
+- **Pi kit and docs:**
+  - The compose file passes `PREPARATION_YEAR`/`APP_TIMEZONE`; `.env.example` sets
+    `PREPARATION_YEAR=2027`.
+  - The handbook covers it in §1.3 and §7.6.
+  - Also updated: `dev_run.md`, CLAUDE.md, the backlog.
+
+**Verification:**
+- **Go:**
+  - The domain boundary tests cover 23:59:59 vs 00:00 local in UTC, Kyiv, Warsaw, New York and
+    Kiritimati, plus the same instant in two zones and nil location = UTC.
+  - Config, resolver and service tests pass.
+  - New integration tests: the dashboard phase, year and countdown follow the header; a topic
+    created without a year is a 2027 topic; and the stage ends at Kyiv midnight while Warsaw still
+    counts down.
+  - Full `make vet lint test test-int`.
+- **Web (191 tests):**
+  - the countdown with fake timers: digits, screen-reader sentence, ticking, the midnight
+    celebration and refetch retries;
+  - the preparation dashboard, both with goals and empty;
+  - the header on API requests;
+  - "New for 2027";
+  - axe on the preparation dashboard;
+  - typecheck, lint, Prettier, build, and the `gen:api` drift check.
+

@@ -39,6 +39,7 @@ type appOptions struct {
 	RateLimit  RateLimitConfig
 	InviteCode string
 	ClientIP   ClientIPConfig
+	Season     SeasonConfig
 }
 
 // startApp starts the full service with auth rate limiting disabled, which is
@@ -98,10 +99,11 @@ func startAppWith(t *testing.T, opts appOptions) *testApp {
 		UserService:      service.NewUserService(userRepo),
 		TopicService:     topicService,
 		GoalService:      service.NewGoalService(goalRepo, topicRepo),
-		DashboardService: service.NewDashboardService(topicService, time.Now),
+		DashboardService: service.NewDashboardService(topicService),
 		TokenVerifier:    tokens,
 		RateLimit:        opts.RateLimit,
 		ClientIP:         opts.ClientIP,
+		Season:           opts.Season,
 		// Secure=false so the cookie jar sends the refresh cookie over the
 		// httptest http:// server (a Secure cookie is withheld on plain HTTP).
 		RefreshCookie: RefreshCookieConfig{Name: refreshCookieName, Path: "/api/v1/auth", Secure: false},

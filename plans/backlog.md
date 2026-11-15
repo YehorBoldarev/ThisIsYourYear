@@ -8,7 +8,8 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
 ### Year rollover & multi-year history
 > Added 2026-11-07. **Time-sensitive:** affects every user on 1 January 2027.
 > **Now planned (2026-11-11):** [`frontend/10-preparation-stage.md`](frontend/10-preparation-stage.md)
-> — a pre-launch "preparation stage" for 2027 plus the year switcher.
+> — a pre-launch "preparation stage" for 2027 plus the year switcher. **Part A (preparation stage,
+> per-user timezone) is implemented**; Part B (year switcher, `?year=` on the dashboard) remains.
 
 - **Problem.** The dashboard, chapter list and Wins page only show the current year, and the UI has
   no year switcher. `GET /topics` accepts `?year=`, but `GET /dashboard` doesn't. When the year
@@ -72,8 +73,8 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
 
 ## Known small issues
 
-- **Footer placeholder links** (`web/src/layout/Footer.tsx`): GitHub points to
-  `github.com/kibou/thisisyouryear` (the repo is `YehorBoldarev/ThisIsYourYear`), and
-  `hello@thisisyour.year` isn't a deliverable address (`.year` isn't a real TLD).
+- ~~Footer placeholder links~~ — resolved 2026-11-15: the GitHub link points to the real repo,
+  and the undeliverable support email (`hello@thisisyour.year`) was removed. Add a contact link
+  back only once a real mailbox exists.
 - **Reflections nav dead end:** decide whether to hide the nav item until Reflections exists or
   keep it as a deliberate teaser.

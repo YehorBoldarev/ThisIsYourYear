@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // dashboardEmptyMessage is shown when the user has no topics yet — a distinct,
 // motivating empty state (the per-topic "set your first goal" copy is wrong here
@@ -31,17 +34,19 @@ func DashboardMessage(overall Progress, topicCount int) string {
 	return Motivate(overall).Message
 }
 
-// NextNewYear returns the instant of the next New Year — Jan 1, 00:00:00 of the
-// year after now — in now's own location.
-func NextNewYear(now time.Time) time.Time {
-	return time.Date(now.Year()+1, time.January, 1, 0, 0, 0, 0, now.Location())
+// PreparationMessage is the dashboard line during the preparation stage, when
+// the year being planned hasn't started yet. Progress bands don't apply before
+// the year begins, so the copy is about planning. Kept beside the other
+// dashboard copy so the app speaks in one voice.
+func PreparationMessage(year, topicCount int) string {
+	if topicCount == 0 {
+		return fmt.Sprintf("Your %d is a blank page. Plan the first goal before the year begins.", year)
+	}
+	return fmt.Sprintf("Every goal you plan now is a head start. %d is almost here.", year)
 }
 
-// Countdown returns the next New Year instant and the whole seconds remaining
-// until it, floored at zero. It is a pure function of now, so it is trivially
-// testable and deterministic.
-func Countdown(now time.Time) (target time.Time, secondsRemaining int64) {
-	target = NextNewYear(now)
-	secondsRemaining = max(int64(target.Sub(now).Seconds()), 0)
-	return target, secondsRemaining
+// SecondsUntil returns the whole seconds from now until target, floored at
+// zero (a target in the past is "now").
+func SecondsUntil(target, now time.Time) int64 {
+	return max(int64(target.Sub(now).Seconds()), 0)
 }

@@ -10,10 +10,13 @@ import (
 	"kibou/thisisyouryear/internal/domain"
 )
 
-// fixedNow returns a deterministic clock for the countdown assertions.
+// fixedNow is the instant the test seasons are resolved for.
 func fixedNow() time.Time {
 	return time.Date(2026, time.July, 7, 12, 0, 0, 0, time.UTC)
 }
+
+// normalSeason is the in-year season at fixedNow (2026, UTC, no preparation).
+func normalSeason() domain.Season { return domain.SeasonAt(fixedNow(), time.UTC, 0) }
 
 // newDashboardService wires a DashboardService over the in-memory topic service,
 // returning the goals fake so tests can seed per-topic progress.
@@ -21,26 +24,26 @@ func newDashboardService() (*DashboardService, *TopicService, *fakeTopicGoals) {
 	topics := newMemTopicRepo()
 	goals := newFakeTopicGoals()
 	topicSvc := NewTopicService(topics, goals)
-	return NewDashboardService(topicSvc, fixedNow), topicSvc, goals
+	return NewDashboardService(topicSvc), topicSvc, goals
 }
 
 func TestDashboardService_EmptyState(t *testing.T) {
 	dash, _, _ := newDashboardService()
 	ctx := context.Background()
 
-	view, err := dash.Get(ctx, "u")
+	view, err := dash.Get(ctx, "u", normalSeason())
 	require.NoError(t, err)
 	require.Equal(t, 0, view.TopicsTotal)
 	require.Equal(t, 0, view.TopicsCompleted)
 	require.Equal(t, 0, view.Progress.Total)
 	require.Equal(t, domain.DashboardMessage(domain.ComputeProgress(0, 0), 0), view.Message)
-	require.Equal(t, domain.CurrentYear(), view.Year)
+	require.Equal(t, 2026, view.Year)
+	require.Equal(t, domain.PhaseYear, view.Phase)
 
-	// Countdown reflects the injected clock.
-	wantTarget, wantSecs := domain.Countdown(fixedNow().UTC())
+	// Counts down to the next New Year from the injected clock.
+	wantTarget := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC)
 	require.True(t, view.CountdownTarget.Equal(wantTarget))
-	require.Equal(t, wantSecs, view.SecondsRemaining)
-	require.Positive(t, view.SecondsRemaining)
+	require.Equal(t, int64(wantTarget.Sub(fixedNow()).Seconds()), view.SecondsRemaining)
 }
 
 func TestDashboardService_AggregatesAcrossTopics(t *testing.T) {
@@ -48,18 +51,18 @@ func TestDashboardService_AggregatesAcrossTopics(t *testing.T) {
 	ctx := context.Background()
 
 	// Three current-year topics with mixed progress: 1/4, 0/2, and 3/3 (complete).
-	a, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "A", Year: domain.CurrentYear()})
+	a, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "A", Year: 2026})
 	require.NoError(t, err)
-	b, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "B", Year: domain.CurrentYear()})
+	b, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "B", Year: 2026})
 	require.NoError(t, err)
-	c, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "C", Year: domain.CurrentYear()})
+	c, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "C", Year: 2026})
 	require.NoError(t, err)
 
 	goals.counts[a.Topic.ID] = domain.ComputeProgress(4, 1)
 	goals.counts[b.Topic.ID] = domain.ComputeProgress(2, 0)
 	goals.counts[c.Topic.ID] = domain.ComputeProgress(3, 3)
 
-	view, err := dash.Get(ctx, "u")
+	view, err := dash.Get(ctx, "u", normalSeason())
 	require.NoError(t, err)
 	require.Equal(t, 3, view.TopicsTotal)
 	require.Equal(t, 1, view.TopicsCompleted, "only the 3/3 topic is complete")
@@ -73,12 +76,40 @@ func TestDashboardService_ExcludesOtherYearsAndArchived(t *testing.T) {
 	dash, topicSvc, _ := newDashboardService()
 	ctx := context.Background()
 
-	_, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "This year", Year: domain.CurrentYear()})
+	_, err := topicSvc.Create(ctx, "u", CreateTopicInput{Title: "This year", Year: 2026})
 	require.NoError(t, err)
 	_, err = topicSvc.Create(ctx, "u", CreateTopicInput{Title: "Old year", Year: 2020})
 	require.NoError(t, err)
 
-	view, err := dash.Get(ctx, "u")
+	view, err := dash.Get(ctx, "u", normalSeason())
 	require.NoError(t, err)
 	require.Equal(t, 1, view.TopicsTotal, "dashboard is scoped to the current year")
+}
+
+func TestDashboardService_PreparationStage(t *testing.T) {
+	dash, topicSvc, _ := newDashboardService()
+	ctx := context.Background()
+	kyiv, err := time.LoadLocation("Europe/Kyiv")
+	require.NoError(t, err)
+	season := domain.SeasonAt(fixedNow(), kyiv, 2027)
+
+	empty, err := dash.Get(ctx, "u", season)
+	require.NoError(t, err)
+	require.Equal(t, 2027, empty.Year)
+	require.Equal(t, domain.PhasePreparation, empty.Phase)
+	require.Equal(t, domain.PreparationMessage(2027, 0), empty.Message)
+	require.Equal(t, "2026-12-31T22:00:00Z", empty.CountdownTarget.Format(time.RFC3339),
+		"counts down to local midnight in Kyiv, reported in UTC")
+	require.Equal(t, int64(empty.CountdownTarget.Sub(fixedNow()).Seconds()), empty.SecondsRemaining)
+
+	// Only the 2027 plans count; this year's topics are out of scope.
+	_, err = topicSvc.Create(ctx, "u", CreateTopicInput{Title: "Plan", Year: 2027})
+	require.NoError(t, err)
+	_, err = topicSvc.Create(ctx, "u", CreateTopicInput{Title: "Old", Year: 2026})
+	require.NoError(t, err)
+
+	planned, err := dash.Get(ctx, "u", season)
+	require.NoError(t, err)
+	require.Equal(t, 1, planned.TopicsTotal)
+	require.Equal(t, domain.PreparationMessage(2027, 1), planned.Message)
 }

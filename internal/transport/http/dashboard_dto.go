@@ -12,8 +12,9 @@ type TopicTallyResponse struct {
 	Completed int `json:"completed"`
 }
 
-// CountdownResponse carries the next New-Year instant (UTC) and the whole
-// seconds remaining. The client localizes the target to the browser timezone.
+// CountdownResponse carries the countdown instant (UTC) and the whole seconds
+// remaining: the start of the year being planned during the preparation stage,
+// otherwise the next New Year — local midnight in the user's timezone.
 type CountdownResponse struct {
 	Target           time.Time `json:"target"`
 	SecondsRemaining int64     `json:"secondsRemaining"`
@@ -21,7 +22,9 @@ type CountdownResponse struct {
 
 // DashboardResponse is the public projection of the year-level summary.
 type DashboardResponse struct {
-	Year      int                `json:"year"`
+	Year int `json:"year"`
+	// Phase is "preparation" before Year has begun, otherwise "year".
+	Phase     string             `json:"phase"`
 	Message   string             `json:"message"`
 	Progress  ProgressResponse   `json:"progress"`
 	Topics    TopicTallyResponse `json:"topics"`
@@ -31,6 +34,7 @@ type DashboardResponse struct {
 func dashboardResponse(v *service.DashboardView) DashboardResponse {
 	return DashboardResponse{
 		Year:    v.Year,
+		Phase:   string(v.Phase),
 		Message: v.Message,
 		Progress: ProgressResponse{
 			Total:     v.Progress.Total,

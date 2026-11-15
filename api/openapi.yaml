@@ -171,12 +171,16 @@ paths:
     get:
       tags: [topics]
       summary: List my topics
-      description: Lists the caller's topics for a year (defaults to the current year).
+      description: |
+        Lists the caller's topics for a year. Without `year` this is the season
+        year: the year being planned during the preparation stage, otherwise the
+        current year in the client's timezone.
       operationId: listTopics
       parameters:
+        - $ref: "#/components/parameters/ClientTimezone"
         - name: year
           in: query
-          description: Filter to this year. Defaults to the current year when omitted.
+          description: Filter to this year. Defaults to the season year when omitted.
           required: false
           schema:
             type: integer
@@ -204,6 +208,8 @@ paths:
       tags: [topics]
       summary: Create a topic
       operationId: createTopic
+      parameters:
+        - $ref: "#/components/parameters/ClientTimezone"
       requestBody:
         required: true
         content:
@@ -373,9 +379,16 @@ paths:
       tags: [dashboard]
       summary: Year summary
       description: |
-        Aggregates the caller's current-year, non-archived topics: overall
-        progress, a topic tally, a positive message, and a New-Year countdown.
+        Aggregates the caller's non-archived topics for the season year: overall
+        progress, a topic tally, a positive message, and a countdown.
+
+        **Preparation stage:** when the server sets `PREPARATION_YEAR` and that
+        year hasn't begun in the client's timezone, `phase` is `preparation`,
+        `year` is the year being planned, and the countdown runs to its start.
+        Otherwise `phase` is `year` and the countdown runs to the next New Year.
       operationId: getDashboard
+      parameters:
+        - $ref: "#/components/parameters/ClientTimezone"
       responses:
         "200":
           description: The aggregate year summary.
@@ -449,6 +462,19 @@ components:
       description: HttpOnly refresh-session cookie set by login and rotated by refresh.
 
   parameters:
+    ClientTimezone:
+      name: X-Client-Timezone
+      in: header
+      required: false
+      description: |
+        The browser's IANA timezone (e.g. `Europe/Kyiv`). It decides which year
+        "now" is and puts the countdown at the user's local midnight. Missing or
+        invalid values fall back to the server's `APP_TIMEZONE` (default UTC).
+      schema:
+        type: string
+        maxLength: 64
+        examples: [Europe/Kyiv]
+
     TopicId:
       name: id
       in: path
@@ -648,7 +674,7 @@ components:
           type: integer
           minimum: 2000
           maximum: 2100
-          description: Optional; defaults to the current year.
+          description: Optional; defaults to the season year (the year being planned during the preparation stage, otherwise the current year).
         color:
           type: string
           description: Hex color, e.g. "#aabbcc".
@@ -829,7 +855,10 @@ components:
         target:
           type: string
           format: date-time
-          description: The next New Year instant, in UTC. Clients localize it.
+          description: |
+            The countdown instant, in UTC: local midnight (in the client's
+            timezone) on 1 January of the year being planned during the
+            preparation stage, otherwise of the next year.
         secondsRemaining:
           type: integer
           format: int64
@@ -837,11 +866,17 @@ components:
 
     Dashboard:
       type: object
-      required: [year, message, progress, topics, countdown]
+      required: [year, phase, message, progress, topics, countdown]
       properties:
         year:
           type: integer
-          description: The year this dashboard summarizes.
+          description: The year this dashboard summarizes (the season year).
+        phase:
+          type: string
+          enum: [preparation, year]
+          description: |
+            `preparation` before `year` has begun (the pre-launch planning stage),
+            otherwise `year`.
         message:
           type: string
           description: The overall progress band's motivation message; a distinct empty-state line when there are no topics.

@@ -27,6 +27,7 @@ export function errorBody(code: string, message: string, fields?: Record<string,
 export function dashboardResponse(overrides: Partial<DashboardResponse> = {}): DashboardResponse {
   return {
     year: 2026,
+    phase: 'year',
     message: 'Small days compound into a remarkable year.',
     progress: { total: 0, completed: 0, ratio: 0 },
     topics: { total: 0, completed: 0 },

@@ -11,7 +11,8 @@ import (
 type CreateTopicRequest struct {
 	Title       string `json:"title" validate:"required,max=120"`
 	Description string `json:"description" validate:"max=2000"`
-	// Year is optional; when 0 the domain defaults it to the current year.
+	// Year is optional; when 0 the handler uses the season year (the year
+	// being planned during the preparation stage, otherwise the current year).
 	Year     int    `json:"year" validate:"omitempty,min=2000,max=2100"`
 	Color    string `json:"color" validate:"omitempty,hexcolor"`
 	Icon     string `json:"icon" validate:"max=64"`

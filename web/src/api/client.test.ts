@@ -20,6 +20,18 @@ describe('api client', () => {
     expect(data?.email).toBe(TEST_USER.email)
   })
 
+  it('sends the browser timezone so the server can tell which year it is', async () => {
+    let seen: string | null = null
+    server.use(
+      http.get('/api/v1/me', ({ request }) => {
+        seen = request.headers.get('X-Client-Timezone')
+        return HttpResponse.json(TEST_USER)
+      }),
+    )
+    await client.GET('/api/v1/me')
+    expect(seen).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  })
+
   it('refreshes once and retries after a 401', async () => {
     const refresh = vi.fn()
     server.use(

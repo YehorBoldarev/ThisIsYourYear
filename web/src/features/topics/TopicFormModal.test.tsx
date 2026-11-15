@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { server, errorBody, topicResponse } from '../../test/msw'
+import { server, errorBody, topicResponse, dashboardResponse } from '../../test/msw'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { TopicFormModal } from './TopicFormModal'
 
@@ -33,6 +33,16 @@ describe('TopicFormModal', () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(created).toMatchObject({ title: 'Learn piano', color: '#3ec5a0' })
+  })
+
+  it('names the year being planned during the preparation stage', async () => {
+    server.use(
+      http.get('/api/v1/dashboard', () =>
+        HttpResponse.json(dashboardResponse({ year: 2027, phase: 'preparation' })),
+      ),
+    )
+    renderModal(<TopicFormModal onClose={vi.fn()} />)
+    expect(await screen.findByText('New for 2027')).toBeInTheDocument()
   })
 
   it('blocks submit and shows an error when the title is empty', async () => {

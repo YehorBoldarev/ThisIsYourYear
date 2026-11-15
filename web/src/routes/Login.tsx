@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { Button, Field, Spinner, Toggle } from '../components'
 import { useAuth } from '../auth/useAuth'
+import { inviteFrom, withInvite } from '../auth/invite'
 import { isApiError, type FieldErrors } from '../api/errors'
 
 export function Login() {
@@ -10,6 +11,9 @@ export function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/'
+  // An invite code reached the sign-in page (e.g. via "Sign in" on sign-up):
+  // keep it on the way back to "Create an account".
+  const invite = inviteFrom(location.search)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -49,7 +53,7 @@ export function Login() {
       footer={
         <>
           New here?{' '}
-          <Link to="/register" className="text-teal-ink hover:underline">
+          <Link to={withInvite('/register', invite)} className="text-teal-ink hover:underline">
             Create an account
           </Link>
         </>

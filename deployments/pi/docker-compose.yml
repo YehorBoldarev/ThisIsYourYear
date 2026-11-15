@@ -40,6 +40,9 @@ services:
       MONGO_DATABASE: thisisyouryear
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 32)}
       REGISTRATION_INVITE_CODE: ${REGISTRATION_INVITE_CODE:-}
+      # Preparation stage (e.g. 2027) and the fallback timezone; see .env.example.
+      PREPARATION_YEAR: ${PREPARATION_YEAR:-}
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       COOKIE_SECURE: "true"
       # Tailscale's requests reach the container from this network's gateway
       # (a loopback-published port arrives via the bridge gateway). Only that
