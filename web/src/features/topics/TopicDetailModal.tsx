@@ -3,8 +3,8 @@ import { ACCENT_HEX } from '../../components/accent'
 import { bandToneClass } from '../../lib/motivation'
 import type { Topic } from './useTopics'
 import { useTopicGoals, type Goal } from './useTopicGoals'
-import { useToggleGoalDone } from './mutations'
-import { MilestoneRow } from './MilestoneRow'
+import { useReorderGoals, useToggleGoalDone } from './mutations'
+import { SortableMilestones } from './SortableMilestones'
 
 interface TopicDetailModalProps {
   topic: Topic
@@ -30,6 +30,7 @@ export function TopicDetailModal({
 }: TopicDetailModalProps) {
   const goalsQuery = useTopicGoals(topic.id)
   const toggle = useToggleGoalDone()
+  const reorder = useReorderGoals(topic.id)
 
   // Toggle a milestone; if completing it clears the last open one, celebrate 100%.
   const handleToggle = (goal: Goal) => {
@@ -72,7 +73,7 @@ export function TopicDetailModal({
 
       {/* Progress block. */}
       <div className="flex items-center gap-5 border-y border-border py-5">
-        <Ring value={ratio} color={accent} size={84} />
+        <Ring value={ratio} color={accent} size={84} label={`${topic.title} progress`} />
         <div>
           <div className="font-serif text-lg text-text">
             {completed} of {total} milestone{total === 1 ? '' : 's'} complete
@@ -108,18 +109,21 @@ export function TopicDetailModal({
             No milestones yet — add the first step toward this goal.
           </p>
         ) : (
-          <ul className="mt-1 divide-y divide-border-subtle">
-            {goalsQuery.data.map((goal) => (
-              <MilestoneRow
-                key={goal.id}
-                goal={goal}
-                accent={accent}
-                onToggle={handleToggle}
-                onEdit={onEditGoal}
-                onDelete={onDeleteGoal}
-              />
-            ))}
-          </ul>
+          <>
+            <SortableMilestones
+              goals={goalsQuery.data}
+              accent={accent}
+              onToggle={handleToggle}
+              onEdit={onEditGoal}
+              onDelete={onDeleteGoal}
+              onReorder={(goalIds) => reorder.mutate(goalIds)}
+            />
+            {reorder.isError && (
+              <p role="alert" className="mt-2 text-sm text-rose">
+                Couldn&rsquo;t save the new order, so it was put back. Please try again.
+              </p>
+            )}
+          </>
         )}
       </div>
 

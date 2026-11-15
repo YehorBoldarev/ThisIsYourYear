@@ -199,6 +199,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/topics/{id}/goals/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The topic id. */
+                id: components["parameters"]["TopicId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder a topic's goals
+         * @description Sets the display order of a topic's goals in one request. `goalIds` must
+         *     list **every** goal of the topic exactly once (in the new order);
+         *     anything else (missing, extra, duplicate or unknown ids — e.g. from a
+         *     stale screen) is a 422 with `fields.goalIds`.
+         */
+        put: operations["reorderGoals"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/goals/{id}": {
         parameters: {
             query?: never;
@@ -222,6 +248,28 @@ export interface paths {
          *     achievement) or `{"done": false}` to reopen it; `order` reorders.
          */
         patch: operations["updateGoal"];
+        trace?: never;
+    };
+    "/api/v1/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Wins for a year
+         * @description The caller's finished, starred goals ("wins") across their non-archived
+         *     topics of a year, newest completion first, each with a summary of its
+         *     topic. One request instead of one goal list per topic.
+         */
+        get: operations["listAchievements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/dashboard": {
@@ -480,6 +528,22 @@ export interface components {
             dueDate?: string;
             /** @description Toggle whether the milestone is celebrated as an achievement (★). */
             isAchievement?: boolean;
+        };
+        ReorderGoalsRequest: {
+            /** @description Every goal id of the topic, each once, in the new order. */
+            goalIds: string[];
+        };
+        TopicSummary: {
+            id: string;
+            title: string;
+            year: number;
+            color: string;
+            icon: string;
+            category: string;
+        };
+        Achievement: {
+            goal: components["schemas"]["Goal"];
+            topic: components["schemas"]["TopicSummary"];
         };
         Goal: {
             id: string;
@@ -955,6 +1019,36 @@ export interface operations {
             422: components["responses"]["ValidationError"];
         };
     };
+    reorderGoals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The topic id. */
+                id: components["parameters"]["TopicId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderGoalsRequest"];
+            };
+        };
+        responses: {
+            /** @description The topic's goals in their new order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
     deleteGoal: {
         parameters: {
             query?: never;
@@ -1005,6 +1099,38 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listAchievements: {
+        parameters: {
+            query?: {
+                /** @description Defaults to the season year (see the dashboard). */
+                year?: number;
+            };
+            header?: {
+                /**
+                 * @description The browser's IANA timezone (e.g. `Europe/Kyiv`). It decides which year
+                 *     "now" is and puts the countdown at the user's local midnight. Missing or
+                 *     invalid values fall back to the server's `APP_TIMEZONE` (default UTC).
+                 */
+                "X-Client-Timezone"?: components["parameters"]["ClientTimezone"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wins, newest first (an empty array when there are none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Achievement"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             422: components["responses"]["ValidationError"];
         };
     };

@@ -27,6 +27,12 @@ func (r CreateGoalRequest) toInput() service.CreateGoalInput {
 	}
 }
 
+// ReorderGoalsRequest is the body of PUT /topics/{id}/goals/order: every goal
+// of the topic, by id, in the new order.
+type ReorderGoalsRequest struct {
+	GoalIDs []string `json:"goalIds" validate:"required,max=500,dive,required"`
+}
+
 // UpdateGoalRequest is the body of PATCH /goals/{id}. Pointer fields make the
 // update partial; `done` toggles completion, `order` reorders.
 type UpdateGoalRequest struct {

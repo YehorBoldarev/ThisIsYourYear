@@ -10,7 +10,11 @@ export function Login() {
   const { status, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/'
+  // Return to where the visitor was headed, query included (e.g. an open goal
+  // popup's ?topic=…), after signing in.
+  const fromLocation = (location.state as { from?: { pathname?: string; search?: string } } | null)
+    ?.from
+  const from = fromLocation?.pathname ? `${fromLocation.pathname}${fromLocation.search ?? ''}` : '/'
   // An invite code reached the sign-in page (e.g. via "Sign in" on sign-up):
   // keep it on the way back to "Create an account".
   const invite = inviteFrom(location.search)

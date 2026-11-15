@@ -112,9 +112,16 @@ Key cross-cutting conventions (each requires reading several files to see):
   (`REGISTRATION_INVITE_CODE` → `AuthService.Register`'s `inviteCode`; `GET /auth/registration`
   tells the SPA whether to show the field).
 - **Operator commands live in the same binary:** `api healthcheck` (Docker healthcheck, hits
-  `/readyz`) and `api admin list-users|reset-password` (`cmd/api/commands.go` → `AdminService`).
-  No arguments = the server. `AdminUserRepository` is the one port **not** scoped by user — it is
-  CLI-only, never mounted on a route.
+  `/readyz`) and `api admin list-users|reset-password|delete-user` (`cmd/api/commands.go` →
+  `AdminService`, wired via `AdminDeps`). No arguments = the server. `AdminUserRepository` is the
+  one port **not** scoped by user — it is CLI-only, never mounted on a route. `delete-user` asks
+  for the email typed back (`--yes` skips) and deletes children first (goals → topics → sessions
+  → user), so a rerun finishes an interrupted delete.
+- **Milestone order:** `PUT /topics/{id}/goals/order` takes *every* goal id once (else 422
+  `fields.goalIds`) and writes positions in one bulk write (`mongo.Repository.SetEach`). New goals
+  go after the highest position (`NextOrder`), never at "count".
+- **Wins** come from `GET /achievements?year=` (default season year): one topics query + one goals
+  query, joined in `AchievementService`. Goal/topic mutations invalidate `['achievements']`.
 
 ## Frontend architecture (`web/`)
 
@@ -126,7 +133,16 @@ React 19 + Vite + TypeScript (strict) + Tailwind CSS v4 + TanStack Query + react
   and once on boot via raw `fetch` to `POST /api/v1/auth/refresh` (raw so it never re-enters the 401
   middleware). Requests are **same-origin**, so the cookie is sent without `credentials: 'include'`.
 - **Server state** is TanStack Query; mutations are optimistic (update cache → rollback →
-  settle-invalidate). Feature folders under `src/features/` (dashboard, topics, celebration,
+  settle-invalidate). `settle` in `mutations.ts` also invalidates Wins (`['achievements']`) and
+  linked single topics (`['topic', id]`).
+- **The goal popup is in the URL** (`?topic=<id>`, `ModalHost`): opening pushes a history entry
+  flagged `{ topicPopup: true }`, so Back closes it; closing pops that entry (or replaces the URL
+  when there's none, e.g. after a reload); a reload/pasted link reopens it, fetching the topic on
+  its own (`useTopic`) when it isn't in this year's list. Only the goal popup is in the URL.
+- **Milestones reorder by drag-and-drop** (`SortableMilestones`, `@dnd-kit`): drag handle per row
+  (pointer, touch and keyboard: Space/arrows/Space), announcements by title + position rendered
+  *inside* the aria-modal popup. Content mid-interaction marks itself `data-captures-escape` so
+  `Modal` leaves Escape to it (a keyboard drag's cancel) instead of closing. Feature folders under `src/features/` (dashboard, topics, celebration,
   achievements). Topic popups are app-level: one `ModalHost` sits above the routes in `App.tsx`;
   open them with `useTopicModals()` (`openDetail`/`openCreate`) from any page or the shell. There is **no achievements endpoint** — wins are derived client-side by fanning
   `GET /topics/{id}/goals` and filtering `done && isAchievement`.

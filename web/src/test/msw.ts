@@ -85,6 +85,7 @@ export const handlers = [
   ),
   http.post('/api/v1/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/v1/dashboard', () => HttpResponse.json(dashboardResponse())),
+  http.get('/api/v1/achievements', () => HttpResponse.json([])),
   http.get('/api/v1/topics', () => HttpResponse.json([])),
   http.post('/api/v1/topics', () => HttpResponse.json(topicResponse(), { status: 201 })),
   http.patch('/api/v1/topics/:id', () => HttpResponse.json(topicResponse())),

@@ -139,11 +139,12 @@ make lint        # golangci-lint v2.15.0 (pinned), same two tag passes
 
 ### 3.3 Manual API smoke test
 
-Available endpoints as of Step 9 (all JSON, base path `/api/v1`):
+Available endpoints as of Step D3 (all JSON, base path `/api/v1`):
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| `POST` | `/api/v1/auth/register` | — | create an account |
+| `GET`  | `/api/v1/auth/registration` | — | sign-up policy: `{inviteRequired}` |
+| `POST` | `/api/v1/auth/register` | — | create an account (`inviteCode` when invite-only) |
 | `POST` | `/api/v1/auth/login` | — | log in; sets refresh cookie, returns access token |
 | `POST` | `/api/v1/auth/refresh` | refresh cookie | rotate & renew tokens |
 | `POST` | `/api/v1/auth/logout` | refresh cookie | revoke session, clear cookie |
@@ -155,9 +156,11 @@ Available endpoints as of Step 9 (all JSON, base path `/api/v1`):
 | `DELETE`| `/api/v1/topics/{id}` | Bearer | delete a topic (cascades its goals) |
 | `POST` | `/api/v1/topics/{id}/goals` | Bearer | add a goal to a topic |
 | `GET`  | `/api/v1/topics/{id}/goals` | Bearer | list a topic's goals (ordered) |
+| `PUT`  | `/api/v1/topics/{id}/goals/order` | Bearer | reorder: body `{goalIds}` lists every goal once |
 | `PATCH`| `/api/v1/goals/{id}` | Bearer | update a goal (`{"done":true}` to complete; `order` to reorder) |
 | `DELETE`| `/api/v1/goals/{id}` | Bearer | delete a goal |
-| `GET`  | `/api/v1/dashboard` | Bearer | year summary: aggregate progress, message, New-Year countdown |
+| `GET`  | `/api/v1/dashboard` | Bearer | year summary: aggregate progress, message, countdown, `phase` |
+| `GET`  | `/api/v1/achievements` | Bearer | Wins: finished, starred goals (`?year=`, default season year), newest first |
 | `GET`  | `/openapi.yaml` | — | the OpenAPI 3.1 contract (served as `application/yaml`) |
 | `GET`  | `/healthz`, `/readyz` | — | liveness / readiness |
 
@@ -455,6 +458,39 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
 ---
 
 ## Changelog
+
+- **Step D3 — Milestone reordering, Wins endpoint, delete-account command, popup in the URL:**
+  - **Reorder (drag-and-drop):**
+    - **Server:** `PUT /topics/{id}/goals/order` takes every goal id once (else 422
+      `fields.goalIds`) and saves the order in one bulk write (`SetEach`). New milestones go after
+      the highest position, which fixes duplicate positions after deletions.
+    - **Popup:** a grip handle on each milestone (`@dnd-kit`: mouse, touch, keyboard with
+      Space/arrows/Space). The change is optimistic and rolls back with a message if saving
+      fails. Announcements use title and position. Escape cancels the drag, not the popup
+      (`data-captures-escape`).
+  - **Wins:** `GET /achievements?year=` returns everything in one request (it was one per big
+    goal). Edits refresh it.
+  - **`api admin delete-user --email X [--yes]`:** shows the counts and asks for the email typed
+    back. It deletes milestones, then big goals, then sessions, then the account. Handbook §7.5
+    now uses it.
+  - **Goal popup in the address:** opening it adds `?topic=<id>` with a history entry, so Back
+    closes it. Reload and links reopen it, fetching a goal outside this year's list on its own;
+    unknown links are dropped. Login returns to the full address.
+  - **Accessibility fix found by the new tests:** the goal popup's progress ring had no accessible
+    name; it's now "*<goal>* progress".
+  - **Bundle:** +16 KB gzipped (`@dnd-kit`).
+  - **Verified:**
+    - Go: `make fmt vet lint test test-int`, with new unit, CLI, repository and HTTP integration
+      tests.
+    - Web: typecheck, ESLint, Prettier, Vitest (210), build, `gen:api` drift.
+
+- **Fix — Footer hidden behind the mobile tab bar:**
+  - **Problem:** on phones the fixed bottom tab bar covered the footer. The page reserved the
+    bar's height with `pb-24` on `<main>`, which ends *before* the footer.
+  - **Fix:** the shell wrapper now reserves `4rem + env(safe-area-inset-bottom)` below everything,
+    footer included; the bar itself pads for the home indicator.
+  - **Tests:** a regression test in `AppShell.test.tsx`.
+  - **Verified:** the layout, app and accessibility tests, ESLint and the build.
 
 - **Fix — Invite code survives every route:**
   - **Before:** opening the site's front page (or any page other than `/register`) with

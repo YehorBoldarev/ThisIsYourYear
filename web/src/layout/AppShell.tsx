@@ -26,7 +26,10 @@ export function AppShell({
   if (!user) return null
 
   return (
-    <div className="flex min-h-screen flex-col">
+    // On mobile the fixed bottom tab bar (~61px) would cover whatever is last on
+    // the page, which is the footer. Reserve its height (plus the home-indicator
+    // inset on phones that have one) below everything, footer included.
+    <div className="flex min-h-screen flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-elevated focus:px-4 focus:py-2 focus:text-sm focus:text-text focus:shadow-popup"
@@ -34,8 +37,7 @@ export function AppShell({
         Skip to content
       </a>
       <Header user={user} yearProgress={yearProgress} onLogout={() => void logout()} />
-      {/* pb-24 on mobile keeps content clear of the fixed bottom tab bar. */}
-      <main id="main" tabIndex={-1} className="flex-1 pb-24 outline-none sm:pb-0">
+      <main id="main" tabIndex={-1} className="flex-1 outline-none">
         {children}
       </main>
       <Footer />

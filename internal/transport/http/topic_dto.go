@@ -133,3 +133,26 @@ func topicResponses(views []service.TopicView) []TopicResponse {
 	}
 	return out
 }
+
+// TopicSummaryResponse is the small projection of a topic that travels with
+// related data (e.g. a win), without progress or motivation.
+type TopicSummaryResponse struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Year     int    `json:"year"`
+	Color    string `json:"color"`
+	Icon     string `json:"icon"`
+	Category string `json:"category"`
+}
+
+func topicSummaryResponse(t domain.Topic) TopicSummaryResponse {
+	return TopicSummaryResponse{
+		ID: t.ID, Title: t.Title, Year: t.Year, Color: t.Color, Icon: t.Icon, Category: t.Category,
+	}
+}
+
+// AchievementResponse is one win: the finished, starred goal and its topic.
+type AchievementResponse struct {
+	Goal  GoalResponse         `json:"goal"`
+	Topic TopicSummaryResponse `json:"topic"`
+}

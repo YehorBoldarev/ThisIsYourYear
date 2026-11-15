@@ -26,8 +26,10 @@ type RouterDeps struct {
 	TopicService     *service.TopicService
 	GoalService      *service.GoalService
 	DashboardService *service.DashboardService
-	TokenVerifier    TokenVerifier
-	RefreshCookie    RefreshCookieConfig
+	// AchievementService serves the Wins list (GET /achievements).
+	AchievementService *service.AchievementService
+	TokenVerifier      TokenVerifier
+	RefreshCookie      RefreshCookieConfig
 
 	// CORSOrigins is the allow-list of browser origins. When empty, no CORS
 	// middleware is installed (same-origin only).
@@ -96,6 +98,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	topicHandler := NewTopicHandler(deps.TopicService, seasons, deps.Logger)
 	goalHandler := NewGoalHandler(deps.GoalService, deps.Logger)
 	dashboardHandler := NewDashboardHandler(deps.DashboardService, seasons, deps.Logger)
+	achievementHandler := NewAchievementHandler(deps.AchievementService, seasons, deps.Logger)
 	authenticator := NewAuthenticator(deps.TokenVerifier, deps.Logger)
 
 	// Versioned API namespace. New feature route groups mount under here without
@@ -133,11 +136,15 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// wildcard-name conflict).
 			protected.Post("/topics/{id}/goals", goalHandler.Create)
 			protected.Get("/topics/{id}/goals", goalHandler.List)
+			protected.Put("/topics/{id}/goals/order", goalHandler.Reorder)
 			protected.Patch("/goals/{id}", goalHandler.Update)
 			protected.Delete("/goals/{id}", goalHandler.Delete)
 
 			// Landing summary: aggregate progress + message + New-Year countdown.
 			protected.Get("/dashboard", dashboardHandler.Get)
+
+			// Wins: finished, starred goals for a year, in one request.
+			protected.Get("/achievements", achievementHandler.List)
 		})
 	})
 

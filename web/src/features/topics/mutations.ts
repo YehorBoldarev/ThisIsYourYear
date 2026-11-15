@@ -4,6 +4,7 @@ import { ApiError } from '../../api/errors'
 import type { components } from '../../api/schema'
 import type { DashboardResponse } from '../dashboard/useDashboard'
 import { seasonYear } from '../dashboard/useSeason'
+import { ACHIEVEMENTS_KEY } from '../achievements/useAchievements'
 import type { Topic } from './useTopics'
 import { type Goal, topicGoalsKey } from './useTopicGoals'
 
@@ -77,6 +78,10 @@ function rollback(qc: QueryClient, snap: Snapshot) {
 function settle(qc: QueryClient, topicId?: string) {
   void qc.invalidateQueries(TOPICS_LISTS)
   void qc.invalidateQueries({ queryKey: DASHBOARD_KEY })
+  // Wins depend on goal status/star and on topic title/colour/deletion.
+  void qc.invalidateQueries({ queryKey: ACHIEVEMENTS_KEY })
+  // A topic fetched on its own for a linked popup (useTopic).
+  void qc.invalidateQueries({ queryKey: ['topic'] })
   if (topicId) void qc.invalidateQueries({ queryKey: topicGoalsKey(topicId) })
 }
 
@@ -258,5 +263,36 @@ export function useDeleteGoal() {
     },
     onError: (_e, _v, snap) => snap && rollback(qc, snap),
     onSettled: (_d, _e, { goal }) => settle(qc, goal.topicId),
+  })
+}
+
+/**
+ * Save a topic's milestone order (drag-and-drop). Optimistic: the list takes
+ * the new order at once and rolls back if the server rejects it (e.g. the list
+ * changed on another device meanwhile).
+ */
+export function useReorderGoals(topicId: string) {
+  const qc = useQueryClient()
+  return useMutation<Goal[], ApiError, string[], Snapshot>({
+    mutationFn: (goalIds) =>
+      client
+        .PUT('/api/v1/topics/{id}/goals/order', {
+          params: { path: { id: topicId } },
+          body: { goalIds },
+        })
+        .then(unwrap),
+    onMutate: async (goalIds) => {
+      const snap = await beginOptimistic(qc, topicId)
+      const goals = qc.getQueryData<Goal[]>(topicGoalsKey(topicId)) ?? []
+      const byId = new Map(goals.map((g) => [g.id, g]))
+      const reordered = goalIds.flatMap((id, order) => {
+        const g = byId.get(id)
+        return g ? [{ ...g, order }] : []
+      })
+      qc.setQueryData(topicGoalsKey(topicId), reordered)
+      return snap
+    },
+    onError: (_e, _v, snap) => snap && rollback(qc, snap),
+    onSettled: () => settle(qc, topicId),
   })
 }

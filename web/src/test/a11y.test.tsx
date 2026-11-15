@@ -128,10 +128,24 @@ describe('accessibility (axe)', () => {
 
   it('wins page has no violations', async () => {
     server.use(
-      http.get('/api/v1/topics', () => HttpResponse.json([topicResponse({ id: 't1' })])),
-      http.get('/api/v1/topics/:id/goals', () =>
+      http.get('/api/v1/achievements', () =>
         HttpResponse.json([
-          goalResponse({ id: 'g1', title: 'First 10k', status: 'done', isAchievement: true }),
+          {
+            goal: goalResponse({
+              id: 'g1',
+              title: 'First 10k',
+              status: 'done',
+              isAchievement: true,
+            }),
+            topic: {
+              id: 't1',
+              title: 'Run a Half-Marathon',
+              year: 2026,
+              color: '',
+              icon: '',
+              category: '',
+            },
+          },
         ]),
       ),
     )

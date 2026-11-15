@@ -29,15 +29,18 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
 - Building it restores the celebration popup's "Reflect on it" action (removed 2026-11-07 because
   it led to the placeholder).
 
-### Milestone reordering in the UI
+### Milestone reordering in the UI — ✅ done 2026-11-15 (drag-and-drop in the goal popup)
+> **Implemented (2026-11-15)** per [`frontend/12-reorder-wins-admin-deeplinks.md`](frontend/12-reorder-wins-admin-deeplinks.md).
 - The API already supports `order`; the UI renders milestones in API order with no drag-and-drop
   (deferred in `05-goals-and-achievements.md` and `frontend/04-topics-goals.md` D4).
 
-### Wins endpoint
+### Wins endpoint — ✅ done 2026-11-15 (`GET /achievements`)
+> **Implemented (2026-11-15)** per [`frontend/12-reorder-wins-admin-deeplinks.md`](frontend/12-reorder-wins-admin-deeplinks.md).
 - The Wins page fans out one `GET /topics/{id}/goals` per topic. Fine for a handful of topics,
   slow for dozens; a dedicated endpoint would make it one request.
 
-### Deep links to topic popups
+### Deep links to topic popups — ✅ done 2026-11-15 (`?topic=<id>`; Back closes the popup)
+> **Implemented (2026-11-15)** per [`frontend/12-reorder-wins-admin-deeplinks.md`](frontend/12-reorder-wins-admin-deeplinks.md).
 - Popups are local state, so a topic detail can't be linked or restored on reload (URL sync
   deferred in `frontend/04-topics-goals.md` D3).
 
@@ -46,7 +49,8 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
   the person keeps the temporary password. Needs `POST /me/password` (current + new) and a small
   account-settings form.
 
-### Admin command to delete an account
+### Admin command to delete an account — ✅ done 2026-11-15 (`api admin delete-user`)
+> **Implemented (2026-11-15)** per [`frontend/12-reorder-wins-admin-deeplinks.md`](frontend/12-reorder-wins-admin-deeplinks.md).
 - `docs/operations.md` §7.5 removes an account with a manual `mongosh` script; an
   `api admin delete-user --email X` command (with confirmation) would be safer.
 
@@ -73,6 +77,8 @@ Deliberately deferred work. Each item still needs its own approved plan (`plans/
 
 ## Known small issues
 
+- ~~Footer hidden behind the mobile tab bar~~ — fixed 2026-11-15: the shell reserves the tab bar's
+  height (plus the home-indicator inset) below the footer instead of below `<main>`.
 - ~~Footer placeholder links~~ — resolved 2026-11-15: the GitHub link points to the real repo,
   and the undeliverable support email (`hello@thisisyour.year`) was removed. Add a contact link
   back only once a real mailbox exists.

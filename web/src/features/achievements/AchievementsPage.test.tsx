@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { goalResponse, server, topicResponse } from '../../test/msw'
+import { goalResponse, server } from '../../test/msw'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { AchievementsPage } from './AchievementsPage'
 
@@ -18,31 +18,60 @@ function renderPage() {
 }
 
 describe('AchievementsPage', () => {
-  it('lists completed, starred milestones and hides the rest', async () => {
+  it('lists the wins from one request, newest first', async () => {
+    let goalListRequests = 0
     server.use(
-      http.get('/api/v1/topics', () =>
-        HttpResponse.json([topicResponse({ id: 't1', title: 'Run a Half-Marathon' })]),
-      ),
-      http.get('/api/v1/topics/:id/goals', () =>
+      http.get('/api/v1/achievements', () =>
         HttpResponse.json([
-          goalResponse({
-            id: 'g1',
-            title: 'First 10k run',
-            status: 'done',
-            isAchievement: true,
-            completedAt: '2026-05-01T00:00:00Z',
-          }),
-          goalResponse({ id: 'g2', title: 'Buy running shoes', status: 'done' }),
-          goalResponse({ id: 'g3', title: 'Register', status: 'todo', isAchievement: true }),
+          {
+            goal: goalResponse({
+              id: 'g2',
+              title: 'Finished book 12',
+              status: 'done',
+              isAchievement: true,
+              completedAt: '2026-06-01T00:00:00Z',
+            }),
+            topic: {
+              id: 't2',
+              title: 'Read 24 books',
+              year: 2026,
+              color: '#5b8def',
+              icon: '',
+              category: '',
+            },
+          },
+          {
+            goal: goalResponse({
+              id: 'g1',
+              title: 'First 10k run',
+              status: 'done',
+              isAchievement: true,
+              completedAt: '2026-05-01T00:00:00Z',
+            }),
+            topic: {
+              id: 't1',
+              title: 'Run a Half-Marathon',
+              year: 2026,
+              color: '',
+              icon: '',
+              category: '',
+            },
+          },
         ]),
       ),
+      http.get('/api/v1/topics/:id/goals', () => {
+        goalListRequests++
+        return HttpResponse.json([])
+      }),
     )
     renderPage()
 
     expect(await screen.findByText('First 10k run')).toBeInTheDocument()
-    expect(screen.getByText(/1 moment worth keeping/i)).toBeInTheDocument()
-    expect(screen.queryByText('Buy running shoes')).not.toBeInTheDocument()
-    expect(screen.queryByText('Register')).not.toBeInTheDocument()
+    expect(screen.getByText(/2 moments worth keeping/i)).toBeInTheDocument()
+    const titles = screen.getAllByRole('listitem').map((li) => li.textContent)
+    expect(titles[0]).toContain('Finished book 12')
+    expect(titles[1]).toContain('Run a Half-Marathon')
+    expect(goalListRequests).toBe(0)
   })
 
   it('shows the empty state when there are no wins', async () => {

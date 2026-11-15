@@ -93,17 +93,18 @@ func startAppWith(t *testing.T, opts appOptions) *testApp {
 
 	topicService := service.NewTopicService(topicRepo, goalRepo)
 	router := NewRouter(RouterDeps{
-		Logger:           quietLogger(),
-		Pinger:           client,
-		AuthService:      authService,
-		UserService:      service.NewUserService(userRepo),
-		TopicService:     topicService,
-		GoalService:      service.NewGoalService(goalRepo, topicRepo),
-		DashboardService: service.NewDashboardService(topicService),
-		TokenVerifier:    tokens,
-		RateLimit:        opts.RateLimit,
-		ClientIP:         opts.ClientIP,
-		Season:           opts.Season,
+		Logger:             quietLogger(),
+		Pinger:             client,
+		AuthService:        authService,
+		UserService:        service.NewUserService(userRepo),
+		TopicService:       topicService,
+		GoalService:        service.NewGoalService(goalRepo, topicRepo),
+		DashboardService:   service.NewDashboardService(topicService),
+		AchievementService: service.NewAchievementService(topicRepo, goalRepo),
+		TokenVerifier:      tokens,
+		RateLimit:          opts.RateLimit,
+		ClientIP:           opts.ClientIP,
+		Season:             opts.Season,
 		// Secure=false so the cookie jar sends the refresh cookie over the
 		// httptest http:// server (a Secure cookie is withheld on plain HTTP).
 		RefreshCookie: RefreshCookieConfig{Name: refreshCookieName, Path: "/api/v1/auth", Secure: false},

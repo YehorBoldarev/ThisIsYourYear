@@ -328,6 +328,40 @@ paths:
         "422":
           $ref: "#/components/responses/ValidationError"
 
+  /api/v1/topics/{id}/goals/order:
+    parameters:
+      - $ref: "#/components/parameters/TopicId"
+    put:
+      tags: [goals]
+      summary: Reorder a topic's goals
+      description: |
+        Sets the display order of a topic's goals in one request. `goalIds` must
+        list **every** goal of the topic exactly once (in the new order);
+        anything else (missing, extra, duplicate or unknown ids — e.g. from a
+        stale screen) is a 422 with `fields.goalIds`.
+      operationId: reorderGoals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderGoalsRequest"
+      responses:
+        "200":
+          description: The topic's goals in their new order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
   /api/v1/goals/{id}:
     parameters:
       - name: id
@@ -373,6 +407,39 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/v1/achievements:
+    get:
+      tags: [goals]
+      summary: Wins for a year
+      description: |
+        The caller's finished, starred goals ("wins") across their non-archived
+        topics of a year, newest completion first, each with a summary of its
+        topic. One request instead of one goal list per topic.
+      operationId: listAchievements
+      parameters:
+        - $ref: "#/components/parameters/ClientTimezone"
+        - name: year
+          in: query
+          description: Defaults to the season year (see the dashboard).
+          required: false
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+      responses:
+        "200":
+          description: The wins, newest first (an empty array when there are none).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Achievement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
 
   /api/v1/dashboard:
     get:
@@ -802,6 +869,43 @@ components:
         isAchievement:
           type: boolean
           description: Toggle whether the milestone is celebrated as an achievement (★).
+
+    ReorderGoalsRequest:
+      type: object
+      required: [goalIds]
+      properties:
+        goalIds:
+          type: array
+          maxItems: 500
+          items:
+            type: string
+          description: Every goal id of the topic, each once, in the new order.
+
+    TopicSummary:
+      type: object
+      required: [id, title, year, color, icon, category]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        year:
+          type: integer
+        color:
+          type: string
+        icon:
+          type: string
+        category:
+          type: string
+
+    Achievement:
+      type: object
+      required: [goal, topic]
+      properties:
+        goal:
+          $ref: "#/components/schemas/Goal"
+        topic:
+          $ref: "#/components/schemas/TopicSummary"
 
     Goal:
       type: object

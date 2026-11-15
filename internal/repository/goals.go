@@ -290,3 +290,97 @@ func goalUpdateFields(u domain.GoalUpdate) bson.M {
 	}
 	return fields
 }
+
+// ListAchievements returns the user's finished, starred goals ("wins") under the
+// given topics, newest completion first. One query regardless of how many
+// topics, riding the userId+topicId index.
+func (r *GoalRepository) ListAchievements(ctx context.Context, userID string, topicIDs []string) ([]domain.Goal, error) {
+	if len(topicIDs) == 0 {
+		return []domain.Goal{}, nil
+	}
+	uid, err := mongo.IDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+	tids := make([]primitive.ObjectID, 0, len(topicIDs))
+	for _, id := range topicIDs {
+		tid, err := mongo.IDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
+		tids = append(tids, tid)
+	}
+	filter := bson.M{
+		"userId":        uid,
+		"topicId":       bson.M{"$in": tids},
+		"status":        string(domain.GoalStatusDone),
+		"isAchievement": true,
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "completedAt", Value: -1}, {Key: "createdAt", Value: -1}})
+	docs, err := r.repo.List(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	goals := make([]domain.Goal, 0, len(docs))
+	for i := range docs {
+		goals = append(goals, *docs[i].toDomain())
+	}
+	return goals, nil
+}
+
+// NextOrder returns the position after the last goal under a topic (0 when the
+// topic has none), so a new goal is appended without colliding with existing
+// positions even after deletions have left gaps.
+func (r *GoalRepository) NextOrder(ctx context.Context, userID, topicID string) (int, error) {
+	uid, err := mongo.IDFromHex(userID)
+	if err != nil {
+		return 0, err
+	}
+	tid, err := mongo.IDFromHex(topicID)
+	if err != nil {
+		return 0, err
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "order", Value: -1}}).SetLimit(1)
+	docs, err := r.repo.List(ctx, bson.M{"userId": uid, "topicId": tid}, opts)
+	if err != nil {
+		return 0, err
+	}
+	if len(docs) == 0 {
+		return 0, nil
+	}
+	return docs[0].Order + 1, nil
+}
+
+// SetOrder gives the listed goals positions 0..n-1 in the given order, in one
+// bulk write scoped by user and topic. If any id doesn't match one of the
+// user's goals under that topic it returns domain.ErrNotFound (the service
+// validates the list first, so this only guards against races).
+func (r *GoalRepository) SetOrder(ctx context.Context, userID, topicID string, goalIDs []string) error {
+	uid, err := mongo.IDFromHex(userID)
+	if err != nil {
+		return err
+	}
+	tid, err := mongo.IDFromHex(topicID)
+	if err != nil {
+		return err
+	}
+	updates := make([]mongo.FilteredSet, 0, len(goalIDs))
+	for i, id := range goalIDs {
+		oid, err := mongo.IDFromHex(id)
+		if err != nil {
+			return err
+		}
+		updates = append(updates, mongo.FilteredSet{
+			Filter: bson.M{"_id": oid, "userId": uid, "topicId": tid},
+			Fields: bson.M{"order": i},
+		})
+	}
+	matched, err := r.repo.SetEach(ctx, updates)
+	if err != nil {
+		return err
+	}
+	if matched != int64(len(goalIDs)) {
+		return domain.ErrNotFound
+	}
+	return nil
+}
