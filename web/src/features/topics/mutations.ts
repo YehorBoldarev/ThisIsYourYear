@@ -3,6 +3,7 @@ import { client } from '../../api/client'
 import { ApiError } from '../../api/errors'
 import type { components } from '../../api/schema'
 import type { DashboardResponse } from '../dashboard/useDashboard'
+import { seasonYear } from '../dashboard/useSeason'
 import type { Topic } from './useTopics'
 import { type Goal, topicGoalsKey } from './useTopicGoals'
 
@@ -102,7 +103,8 @@ export function useCreateTopic() {
         id: `tmp-${Date.now()}`,
         title: body.title,
         description: body.description ?? '',
-        year: body.year ?? new Date().getFullYear(),
+        // The server defaults a missing year to the season year; mirror it.
+        year: body.year ?? seasonYear(qc),
         color: body.color ?? '',
         icon: body.icon ?? '',
         category: body.category ?? '',

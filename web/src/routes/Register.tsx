@@ -4,6 +4,7 @@ import { AuthLayout } from './AuthLayout'
 import { Button, Field, Spinner } from '../components'
 import { useAuth } from '../auth/useAuth'
 import { useRegistrationInfo } from '../auth/useRegistrationInfo'
+import { inviteFrom, withInvite } from '../auth/invite'
 import { isApiError, type FieldErrors } from '../api/errors'
 
 export function Register() {
@@ -15,7 +16,7 @@ export function Register() {
   const [password, setPassword] = useState('')
   // An invite link (/register?invite=CODE) prefills the code.
   const [searchParams] = useSearchParams()
-  const inviteFromLink = searchParams.get('invite')?.trim() ?? ''
+  const inviteFromLink = inviteFrom(searchParams.toString())
   const [inviteCode, setInviteCode] = useState(inviteFromLink)
   const { data: registration } = useRegistrationInfo()
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -56,7 +57,7 @@ export function Register() {
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="text-teal-ink hover:underline">
+          <Link to={withInvite('/login', inviteCode)} className="text-teal-ink hover:underline">
             Sign in
           </Link>
         </>

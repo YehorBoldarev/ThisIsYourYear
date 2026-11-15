@@ -11,13 +11,14 @@ import (
 // DashboardHandler serves the dashboard endpoint. It resolves the owner from the
 // authenticated context, so it must be mounted behind the auth middleware.
 type DashboardHandler struct {
-	svc    *service.DashboardService
-	logger *slog.Logger
+	svc     *service.DashboardService
+	seasons *SeasonResolver
+	logger  *slog.Logger
 }
 
 // NewDashboardHandler builds a DashboardHandler.
-func NewDashboardHandler(svc *service.DashboardService, logger *slog.Logger) *DashboardHandler {
-	return &DashboardHandler{svc: svc, logger: logger}
+func NewDashboardHandler(svc *service.DashboardService, seasons *SeasonResolver, logger *slog.Logger) *DashboardHandler {
+	return &DashboardHandler{svc: svc, seasons: seasons, logger: logger}
 }
 
 // Get handles GET /dashboard.
@@ -27,7 +28,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		respondError(w, h.logger, r, domain.ErrUnauthenticated)
 		return
 	}
-	view, err := h.svc.Get(r.Context(), userID)
+	view, err := h.svc.Get(r.Context(), userID, h.seasons.Resolve(r))
 	if err != nil {
 		respondError(w, h.logger, r, err)
 		return

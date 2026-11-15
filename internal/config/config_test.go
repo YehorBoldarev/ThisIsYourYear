@@ -40,6 +40,32 @@ func TestLoad_Defaults(t *testing.T) {
 	require.Empty(t, cfg.TrustedProxyPrefixes())
 	require.Equal(t, "X-Forwarded-For", cfg.ClientIPHeader)
 	require.Empty(t, cfg.RegistrationInviteCode)
+
+	// No preparation stage; UTC fallback timezone.
+	require.Zero(t, cfg.PreparationYear)
+	require.Equal(t, "UTC", cfg.AppTimezone)
+	require.Equal(t, time.UTC, cfg.Location())
+}
+
+// Docker Compose passes an unset .env value as an empty variable
+// (PREPARATION_YEAR: ${PREPARATION_YEAR:-}); that must mean "off", not an error.
+func TestLoad_EmptyPreparationYearIsOff(t *testing.T) {
+	clearKnownEnv(t)
+	t.Setenv("PREPARATION_YEAR", "")
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Zero(t, cfg.PreparationYear)
+}
+
+func TestLoad_PreparationStage(t *testing.T) {
+	clearKnownEnv(t)
+	t.Setenv("PREPARATION_YEAR", "2027")
+	t.Setenv("APP_TIMEZONE", " Europe/Kyiv ")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 2027, cfg.PreparationYear)
+	require.Equal(t, "Europe/Kyiv", cfg.Location().String())
 }
 
 func TestLoad_ProxyAndInvite(t *testing.T) {
@@ -98,6 +124,10 @@ func TestLoad_InvalidValues(t *testing.T) {
 		"bad trusted proxy":    {"TRUSTED_PROXIES": "not-an-ip"},
 		"bad trusted cidr":     {"TRUSTED_PROXIES": "172.30.42.0/99"},
 		"short invite code":    {"REGISTRATION_INVITE_CODE": "abc123"},
+		"preparation too old":  {"PREPARATION_YEAR": "1999"},
+		"preparation too far":  {"PREPARATION_YEAR": "2101"},
+		"preparation not int":  {"PREPARATION_YEAR": "next"},
+		"unknown timezone":     {"APP_TIMEZONE": "Mars/Olympus_Mons"},
 	}
 
 	for name, overrides := range tests {
@@ -127,6 +157,7 @@ func TestValidate(t *testing.T) {
 			RefreshTTLRemember: 744 * time.Hour,
 			RefreshTTLDefault:  24 * time.Hour,
 			BcryptCost:         12,
+			AppTimezone:        "UTC",
 		}
 	}
 
@@ -198,6 +229,7 @@ func clearKnownEnv(t *testing.T) {
 		"REFRESH_TTL_DEFAULT", "BCRYPT_COST", "COOKIE_DOMAIN", "COOKIE_SECURE",
 		"CORS_ALLOWED_ORIGINS", "RATE_LIMIT_AUTH_REQUESTS", "RATE_LIMIT_AUTH_WINDOW",
 		"TRUSTED_PROXIES", "CLIENT_IP_HEADER", "REGISTRATION_INVITE_CODE",
+		"PREPARATION_YEAR", "APP_TIMEZONE",
 	} {
 		original, existed := os.LookupEnv(key)
 		require.NoError(t, os.Unsetenv(key))

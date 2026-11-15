@@ -41,6 +41,10 @@ type RouterDeps struct {
 	// value trusts none: the client IP is always the direct peer address.
 	ClientIP ClientIPConfig
 
+	// Season decides which year the app is about per request (preparation
+	// stage + the client's timezone). The zero value: no preparation, UTC.
+	Season SeasonConfig
+
 	// SPAFS, when non-nil, is the built single-page app served for any route the
 	// API/ops groups don't match (with a client-side-routing fallback to
 	// index.html). Nil ⇒ API-only: unmatched routes get the default 404.
@@ -88,9 +92,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	authHandler := NewAuthHandler(deps.AuthService, deps.RefreshCookie, deps.Logger)
 	userHandler := NewUserHandler(deps.UserService, deps.Logger)
-	topicHandler := NewTopicHandler(deps.TopicService, deps.Logger)
+	seasons := NewSeasonResolver(deps.Season)
+	topicHandler := NewTopicHandler(deps.TopicService, seasons, deps.Logger)
 	goalHandler := NewGoalHandler(deps.GoalService, deps.Logger)
-	dashboardHandler := NewDashboardHandler(deps.DashboardService, deps.Logger)
+	dashboardHandler := NewDashboardHandler(deps.DashboardService, seasons, deps.Logger)
 	authenticator := NewAuthenticator(deps.TokenVerifier, deps.Logger)
 
 	// Versioned API namespace. New feature route groups mount under here without

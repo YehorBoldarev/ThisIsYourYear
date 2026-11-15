@@ -82,6 +82,14 @@ type Config struct {
 	// must present this code. Empty means open registration.
 	RegistrationInviteCode string `env:"REGISTRATION_INVITE_CODE"`
 
+	// PreparationYear, when set (e.g. 2027), puts the app in a preparation stage
+	// for that year until it begins in each user's timezone: plans are made for
+	// it and the dashboard counts down to it. Afterwards it has no effect. 0 = off.
+	PreparationYear int `env:"PREPARATION_YEAR"`
+	// AppTimezone is the IANA timezone used when a request doesn't say which
+	// timezone the user is in (the SPA sends it in X-Client-Timezone).
+	AppTimezone string `env:"APP_TIMEZONE" envDefault:"UTC"`
+
 	LogLevel string `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -116,12 +124,23 @@ func Load() (Config, error) {
 	cfg.TrustedProxies = cleanOrigins(cfg.TrustedProxies)
 	cfg.ClientIPHeader = strings.TrimSpace(cfg.ClientIPHeader)
 	cfg.RegistrationInviteCode = strings.TrimSpace(cfg.RegistrationInviteCode)
+	cfg.AppTimezone = strings.TrimSpace(cfg.AppTimezone)
 
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
 
 	return cfg, nil
+}
+
+// Location returns APP_TIMEZONE as a *time.Location (UTC if it can't be loaded,
+// which Load's validation already rules out).
+func (c Config) Location() *time.Location {
+	loc, err := time.LoadLocation(c.AppTimezone)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 // TrustedProxyPrefixes returns TRUSTED_PROXIES as network prefixes (a bare IP
@@ -201,6 +220,16 @@ func (c Config) validate() error {
 	}
 	if len(c.TrustedProxies) > 0 && c.ClientIPHeader == "" {
 		return fmt.Errorf("CLIENT_IP_HEADER must be set when TRUSTED_PROXIES is set")
+	}
+
+	if c.PreparationYear != 0 && (c.PreparationYear < 2000 || c.PreparationYear > 2100) {
+		return fmt.Errorf("invalid PREPARATION_YEAR %d: must be in range 2000-2100 (or empty to disable)", c.PreparationYear)
+	}
+	if c.AppTimezone == "" {
+		return fmt.Errorf("APP_TIMEZONE must not be empty")
+	}
+	if _, err := time.LoadLocation(c.AppTimezone); err != nil {
+		return fmt.Errorf("invalid APP_TIMEZONE %q: must be an IANA timezone such as Europe/Kyiv", c.AppTimezone)
 	}
 
 	// Rate limiting: a negative count is nonsensical; 0 is the explicit "off"

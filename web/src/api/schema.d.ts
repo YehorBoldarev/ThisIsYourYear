@@ -136,7 +136,9 @@ export interface paths {
         };
         /**
          * List my topics
-         * @description Lists the caller's topics for a year (defaults to the current year).
+         * @description Lists the caller's topics for a year. Without `year` this is the season
+         *     year: the year being planned during the preparation stage, otherwise the
+         *     current year in the client's timezone.
          */
         get: operations["listTopics"];
         put?: never;
@@ -231,8 +233,13 @@ export interface paths {
         };
         /**
          * Year summary
-         * @description Aggregates the caller's current-year, non-archived topics: overall
-         *     progress, a topic tally, a positive message, and a New-Year countdown.
+         * @description Aggregates the caller's non-archived topics for the season year: overall
+         *     progress, a topic tally, a positive message, and a countdown.
+         *
+         *     **Preparation stage:** when the server sets `PREPARATION_YEAR` and that
+         *     year hasn't begun in the client's timezone, `phase` is `preparation`,
+         *     `year` is the year being planned, and the countdown runs to its start.
+         *     Otherwise `phase` is `year` and the countdown runs to the next New Year.
          */
         get: operations["getDashboard"];
         put?: never;
@@ -398,7 +405,7 @@ export interface components {
         CreateTopicRequest: {
             title: string;
             description?: string;
-            /** @description Optional; defaults to the current year. */
+            /** @description Optional; defaults to the season year (the year being planned during the preparation stage, otherwise the current year). */
             year?: number;
             /** @description Hex color, e.g. "#aabbcc". */
             color?: string;
@@ -505,7 +512,9 @@ export interface components {
         Countdown: {
             /**
              * Format: date-time
-             * @description The next New Year instant, in UTC. Clients localize it.
+             * @description The countdown instant, in UTC: local midnight (in the client's
+             *     timezone) on 1 January of the year being planned during the
+             *     preparation stage, otherwise of the next year.
              */
             target: string;
             /**
@@ -515,8 +524,14 @@ export interface components {
             secondsRemaining: number;
         };
         Dashboard: {
-            /** @description The year this dashboard summarizes. */
+            /** @description The year this dashboard summarizes (the season year). */
             year: number;
+            /**
+             * @description `preparation` before `year` has begun (the pre-launch planning stage),
+             *     otherwise `year`.
+             * @enum {string}
+             */
+            phase: "preparation" | "year";
             /** @description The overall progress band's motivation message; a distinct empty-state line when there are no topics. */
             message: string;
             progress: components["schemas"]["Progress"];
@@ -584,6 +599,12 @@ export interface components {
         };
     };
     parameters: {
+        /**
+         * @description The browser's IANA timezone (e.g. `Europe/Kyiv`). It decides which year
+         *     "now" is and puts the countdown at the user's local midnight. Missing or
+         *     invalid values fall back to the server's `APP_TIMEZONE` (default UTC).
+         */
+        ClientTimezone: string;
         /** @description The topic id. */
         TopicId: string;
     };
@@ -738,12 +759,19 @@ export interface operations {
     listTopics: {
         parameters: {
             query?: {
-                /** @description Filter to this year. Defaults to the current year when omitted. */
+                /** @description Filter to this year. Defaults to the season year when omitted. */
                 year?: number;
                 /** @description Include archived topics in the result. */
                 includeArchived?: boolean;
             };
-            header?: never;
+            header?: {
+                /**
+                 * @description The browser's IANA timezone (e.g. `Europe/Kyiv`). It decides which year
+                 *     "now" is and puts the countdown at the user's local midnight. Missing or
+                 *     invalid values fall back to the server's `APP_TIMEZONE` (default UTC).
+                 */
+                "X-Client-Timezone"?: components["parameters"]["ClientTimezone"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -764,7 +792,14 @@ export interface operations {
     createTopic: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description The browser's IANA timezone (e.g. `Europe/Kyiv`). It decides which year
+                 *     "now" is and puts the countdown at the user's local midnight. Missing or
+                 *     invalid values fall back to the server's `APP_TIMEZONE` (default UTC).
+                 */
+                "X-Client-Timezone"?: components["parameters"]["ClientTimezone"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -976,7 +1011,14 @@ export interface operations {
     getDashboard: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /**
+                 * @description The browser's IANA timezone (e.g. `Europe/Kyiv`). It decides which year
+                 *     "now" is and puts the countdown at the user's local midnight. Missing or
+                 *     invalid values fall back to the server's `APP_TIMEZONE` (default UTC).
+                 */
+                "X-Client-Timezone"?: components["parameters"]["ClientTimezone"];
+            };
             path?: never;
             cookie?: never;
         };

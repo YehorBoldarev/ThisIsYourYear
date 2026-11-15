@@ -8,11 +8,20 @@ import { useAuth } from '../auth/useAuth'
 /**
  * App chrome: header + routed content + footer, plus the mobile bottom tab bar.
  * Rendered only inside RequireAuth, so a user is always present. `onNew` is the
- * tab bar's "New ＋" (create a big goal).
+ * tab bar's "New ＋" (create a big goal). While `preparing` (the year being
+ * planned hasn't begun) the logo's year ring stays empty.
  */
-export function AppShell({ children, onNew }: { children: ReactNode; onNew: () => void }) {
+export function AppShell({
+  children,
+  onNew,
+  preparing = false,
+}: {
+  children: ReactNode
+  onNew: () => void
+  preparing?: boolean
+}) {
   const { user, logout } = useAuth()
-  const yearProgress = yearElapsedFraction()
+  const yearProgress = preparing ? 0 : yearElapsedFraction()
 
   if (!user) return null
 

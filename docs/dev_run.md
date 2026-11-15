@@ -82,6 +82,8 @@ for a local run. Common overrides:
 | `TRUSTED_PROXIES` | empty | comma-separated IPs/CIDRs of reverse proxies allowed to state the client IP; empty = never trust forwarding headers |
 | `CLIENT_IP_HEADER` | `X-Forwarded-For` | header read from a trusted proxy; must hold **one** IP (chains are ignored) |
 | `REGISTRATION_INVITE_CODE` | empty | non-empty (≥ 8 chars) makes sign-up invite-only; empty = open registration |
+| `PREPARATION_YEAR` | empty (off) | e.g. `2027`: before that year begins (user's local midnight) the app plans for it and the dashboard counts down to it; inert afterwards |
+| `APP_TIMEZONE` | `UTC` | IANA fallback timezone when a request has no `X-Client-Timezone` header (the SPA always sends it) |
 
 Example with overrides:
 
@@ -453,6 +455,33 @@ and on demand (Actions tab → CI → *Run workflow*). Design: `plans/frontend/0
 ---
 
 ## Changelog
+
+- **Fix — Invite code survives every route:**
+  - **Before:** opening the site's front page (or any page other than `/register`) with
+    `?invite=…` while signed out showed the login page and dropped the code, so "Create an
+    account" asked for it again.
+  - **Now:** a signed-out visitor with `?invite=…` on any page goes straight to sign-up with the
+    code filled in (`RequireAuth`), and the "Sign in" / "Create an account" links carry the code,
+    including one typed by hand (`src/auth/invite.ts`).
+  - **Also fixed:** the footer's GitHub link (now `YehorBoldarev/ThisIsYourYear`), and the footer's
+    undeliverable support email (`hello@thisisyour.year`) was removed.
+  - **Verified:** web typecheck, ESLint, Prettier, Vitest (197), build.
+
+- **Step D1 Part A — Preparation stage for 2027:**
+  - **Server — season rule.** `domain.SeasonAt` decides the year the app is about, per request, from
+    the user's timezone. The SPA sends `X-Client-Timezone`; `APP_TIMEZONE` is the fallback.
+  - **Server — preparation stage.** Until `PREPARATION_YEAR` (e.g. 2027) begins at the user's local
+    midnight, new goals belong to that year, the default topic list shows it, and `GET /dashboard`
+    returns `phase: "preparation"` with a countdown to that midnight. It ends by itself; afterwards
+    the setting is inert.
+  - **Dashboard.** It shows a live `NewYearCountdown` (days/hours/min/sec; minute-precision
+    screen-reader text) instead of the year bar, including in the empty state. At zero it shows
+    "Happy New Year" and refetches into the normal view.
+  - **Wording follows the season year:** "New for 2027", empty state, optimistic topics. The logo
+    ring is empty while preparing.
+  - **Pi kit:** `PREPARATION_YEAR=2027` and `APP_TIMEZONE` (handbook §7.6).
+  - **Verified:** Go gates, unit and integration tests (incl. per-timezone midnight), and web gates
+    (191 tests).
 
 - **Step C3 — Self-hosting on a Raspberry Pi (Tailscale Funnel):**
   - **Real visitor IP.** New `clientIPMiddleware`: `TRUSTED_PROXIES` + `CLIENT_IP_HEADER`

@@ -94,6 +94,38 @@ describe('accessibility (axe)', () => {
     await expectNoViolations(container)
   })
 
+  it('preparation-stage dashboard (countdown) has no violations', async () => {
+    server.use(
+      http.post('/api/v1/auth/refresh', () => HttpResponse.json(tokenResponse())),
+      http.get('/api/v1/dashboard', () =>
+        HttpResponse.json(
+          dashboardResponse({
+            year: 2027,
+            phase: 'preparation',
+            topics: { total: 1, completed: 0 },
+            countdown: { target: '2027-01-01T00:00:00Z', secondsRemaining: 4_000_000 },
+          }),
+        ),
+      ),
+      http.get('/api/v1/topics', () => HttpResponse.json([topicResponse({ year: 2027 })])),
+    )
+    const { container } = render(
+      <MemoryRouter>
+        <QueryClientProvider client={client()}>
+          <AuthProvider>
+            <ThemeProvider>
+              <ModalHost>
+                <Dashboard />
+              </ModalHost>
+            </ThemeProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('region', { name: 'Countdown to 2027' })).toBeInTheDocument()
+    await expectNoViolations(container)
+  })
+
   it('wins page has no violations', async () => {
     server.use(
       http.get('/api/v1/topics', () => HttpResponse.json([topicResponse({ id: 't1' })])),

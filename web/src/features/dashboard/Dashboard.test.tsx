@@ -71,6 +71,47 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Your year is a blank page.')).toBeInTheDocument()
   })
 
+  it('counts down to the year being planned during the preparation stage', async () => {
+    server.use(
+      http.get('/api/v1/dashboard', () =>
+        HttpResponse.json(
+          dashboardResponse({
+            year: 2027,
+            phase: 'preparation',
+            topics: { total: 1, completed: 0 },
+            message: 'Every goal you plan now is a head start. 2027 is almost here.',
+            countdown: { target: '2027-01-01T00:00:00Z', secondsRemaining: 4_000_000 },
+          }),
+        ),
+      ),
+      http.get('/api/v1/topics', () => HttpResponse.json([topicResponse({ year: 2027 })])),
+    )
+    renderDashboard()
+    expect(await screen.findByRole('region', { name: 'Countdown to 2027' })).toBeInTheDocument()
+    expect(screen.getByText('2027 begins in')).toBeInTheDocument()
+    expect(screen.getByText(/2027 is almost here/)).toBeInTheDocument()
+    expect(screen.queryByText(/You are here ·/)).not.toBeInTheDocument()
+    expect(screen.getAllByText('Run a Half-Marathon').length).toBeGreaterThan(0)
+  })
+
+  it('shows the countdown in the empty state while preparing', async () => {
+    server.use(
+      http.get('/api/v1/dashboard', () =>
+        HttpResponse.json(
+          dashboardResponse({
+            year: 2027,
+            phase: 'preparation',
+            countdown: { target: '2027-01-01T00:00:00Z', secondsRemaining: 4_000_000 },
+          }),
+        ),
+      ),
+      http.get('/api/v1/topics', () => HttpResponse.json([])),
+    )
+    renderDashboard()
+    expect(await screen.findByText('Your 2027 is a blank page.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Countdown to 2027' })).toBeInTheDocument()
+  })
+
   it('shows an error state with retry when a query fails', async () => {
     server.use(
       http.get('/api/v1/dashboard', () =>

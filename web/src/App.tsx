@@ -3,6 +3,7 @@ import { AppShell } from './layout/AppShell'
 import { RequireAuth } from './auth/RequireAuth'
 import { ModalHost } from './features/topics/ModalHost'
 import { useTopicModals } from './features/topics/topicModalsContext'
+import { useSeason } from './features/dashboard/useSeason'
 import { Dashboard } from './routes/Dashboard'
 import { Achievements } from './routes/Achievements'
 import { Reflections } from './routes/Reflections'
@@ -27,6 +28,7 @@ function ProtectedLayout() {
 
 function ShellWithModals() {
   const { openCreate } = useTopicModals()
+  const { preparing } = useSeason()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   // Create over the dashboard, wherever "New" was tapped, so the user sees where
@@ -36,7 +38,7 @@ function ShellWithModals() {
     openCreate()
   }
   return (
-    <AppShell onNew={onNew}>
+    <AppShell onNew={onNew} preparing={preparing}>
       <Outlet />
     </AppShell>
   )

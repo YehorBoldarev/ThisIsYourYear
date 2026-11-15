@@ -47,6 +47,8 @@ func run() error {
 		slog.String("app_env", string(cfg.AppEnv)),
 		slog.Int("http_port", cfg.HTTPPort),
 		slog.String("mongo_database", cfg.MongoDatabase),
+		slog.Int("preparation_year", cfg.PreparationYear),
+		slog.String("app_timezone", cfg.AppTimezone),
 	)
 
 	// Root context cancelled on SIGINT/SIGTERM drives graceful shutdown.
@@ -87,7 +89,7 @@ func run() error {
 	userService := service.NewUserService(userRepo)
 	topicService := service.NewTopicService(topicRepo, goalRepo)
 	goalService := service.NewGoalService(goalRepo, topicRepo)
-	dashboardService := service.NewDashboardService(topicService, time.Now)
+	dashboardService := service.NewDashboardService(topicService)
 
 	router := transporthttp.NewRouter(transporthttp.RouterDeps{
 		Logger:           logger,
@@ -112,6 +114,11 @@ func run() error {
 		ClientIP: transporthttp.ClientIPConfig{
 			TrustedProxies: cfg.TrustedProxyPrefixes(),
 			Header:         cfg.ClientIPHeader,
+		},
+		Season: transporthttp.SeasonConfig{
+			PreparationYear: cfg.PreparationYear,
+			DefaultLocation: cfg.Location(),
+			Now:             time.Now,
 		},
 		// Present only in the `-tags embedui` build; nil otherwise (API-only).
 		SPAFS: webui.FS(),

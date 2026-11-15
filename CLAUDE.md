@@ -100,6 +100,13 @@ Key cross-cutting conventions (each requires reading several files to see):
   read everywhere via `clientIP(r)` — rate limiter, session IP, access log (`client_ip`). A
   forwarding header (`CLIENT_IP_HEADER`, single IP only) is honoured **only** from
   `TRUSTED_PROXIES`; never add `middleware.RealIP`.
+- **"Which year is it" is the season** (`domain.SeasonAt`, plan D1): the current year in the
+  *user's* timezone (the SPA sends `X-Client-Timezone`; fallback `APP_TIMEZONE`), or — while
+  `PREPARATION_YEAR` lies ahead — that year, with the dashboard in `phase: "preparation"` counting
+  down to its local midnight. Handlers resolve it once per request via `SeasonResolver` and pass
+  the year/season explicitly (topic create/list defaults, dashboard); services hold no clock. Don't
+  use `domain.CurrentYear()` (UTC) for new request paths. The SPA reads it via `useSeason()`
+  (from the dashboard query). The binary embeds `time/tzdata` (distroless has no zoneinfo).
 - **Business-rule field errors** use `*domain.FieldError{Field, Message}` (unwraps to
   `ErrValidation`); `respondError` renders it as a 422 with `fields`. Used by invite-only sign-up
   (`REGISTRATION_INVITE_CODE` → `AuthService.Register`'s `inviteCode`; `GET /auth/registration`

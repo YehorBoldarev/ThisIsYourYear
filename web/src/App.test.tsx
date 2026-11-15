@@ -36,4 +36,24 @@ describe('App', () => {
     // It moved to the dashboard, so the saved chapter appears right behind the popup.
     expect(screen.queryByRole('heading', { name: 'Your achievements' })).not.toBeInTheDocument()
   })
+
+  it('opens sign-up with the code when a signed-out visitor follows an invite to any page', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    server.use(
+      http.get('/api/v1/auth/registration', () => HttpResponse.json({ inviteRequired: true })),
+    )
+    render(
+      <ThemeProvider>
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={['/?invite=sunflower-2027']}>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </MemoryRouter>
+        </QueryClientProvider>
+      </ThemeProvider>,
+    )
+    expect(await screen.findByLabelText('Invite code')).toHaveValue('sunflower-2027')
+    expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument()
+  })
 })

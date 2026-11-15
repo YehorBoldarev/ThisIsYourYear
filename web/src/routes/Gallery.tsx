@@ -19,6 +19,7 @@ import {
   Toggle,
   type AccentColor,
 } from '../components'
+import { NewYearCountdown } from '../features/dashboard/NewYearCountdown'
 
 const ICONS: IconName[] = [
   'check',
@@ -100,6 +101,16 @@ export function Gallery() {
           <ProgressBar value={0.75} height={6} accent="teal" label="Goal" />
           <ProgressBar value={0.33} height={6} accent="blue" label="Goal" />
           <ProgressBar value={1} height={6} accent="gold" label="Goal" />
+        </div>
+      </Section>
+
+      <Section title="New-Year countdown (preparation stage)">
+        <div className="w-full">
+          <NewYearCountdown
+            target={new Date(new Date().getFullYear() + 1, 0, 1).toISOString()}
+            year={new Date().getFullYear() + 1}
+          />
+          <NewYearCountdown target={new Date(0).toISOString()} year={2027} />
         </div>
       </Section>
 
